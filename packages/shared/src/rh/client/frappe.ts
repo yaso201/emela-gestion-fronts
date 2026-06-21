@@ -18,7 +18,10 @@ import type {
   EmployeeStatus, ContractStatus, ContractType, PayrollRunStatus,
 } from '../types';
 
-const BASE = '/api';
+// Base API : relatif par défaut (même origine, ex. reverse-proxy sous le domaine
+// Frappe) ; surchargeable en cross-origin via PUBLIC_FRAPPE_URL.
+const ROOT = (import.meta as any).env?.PUBLIC_FRAPPE_URL ?? '';
+const BASE = `${ROOT}/api`;
 
 async function method<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
