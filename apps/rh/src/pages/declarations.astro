@@ -1,0 +1,112 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getDeclarations, DECLARATION_STATUS, fcfa } from '@emela/shared/rh-data';
+
+// Historique : déclarations déjà produites ou transmises.
+const declarations = (await getDeclarations()).filter((d) => d.status !== 'a_produire');
+const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-2026-04': '9 mai 2026', 'CNSS-2026-T1': '13 avr. 2026' };
+---
+<Layout title="Déclarations — emela RH" page="declarations">
+<style is:global>
+  .decl-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5); margin-bottom:var(--space-8); }
+  @media (max-width:840px){ .decl-grid { grid-template-columns:1fr; } }
+  .decl { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; display:flex; flex-direction:column; }
+  .decl-head { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-6) var(--space-7); border-bottom:1px solid var(--border-subtle); }
+  .decl-ic { width:44px; height:44px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .decl-ic.cnss { background:var(--ink-50); color:var(--ink-700); }
+  .decl-ic.its { background:var(--accent-50); color:var(--accent-700); }
+  .decl-head .tt { font-size:var(--text-base); font-weight:700; }
+  .decl-head .st { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+  .decl-body { padding:var(--space-6) var(--space-7); display:flex; flex-direction:column; gap:var(--space-4); flex:1; }
+  .decl-line { display:flex; justify-content:space-between; align-items:baseline; font-size:var(--text-sm); }
+  .decl-line .k { color:var(--text-secondary); }
+  .decl-line .v { font-family:var(--font-mono); font-weight:600; font-variant-numeric:tabular-nums; }
+  .decl-line.total { border-top:1.5px solid var(--border-strong); padding-top:var(--space-4); margin-top:var(--space-2); }
+  .decl-line.total .v { font-size:var(--text-md); }
+  .decl-foot { padding:var(--space-5) var(--space-7); border-top:1px solid var(--border-subtle); background:var(--sand-25); display:flex; gap:var(--space-3); flex-wrap:wrap; }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Déclarations &amp; états sociaux</h1><p class="sub">Période <b>mai 2026</b> · états CNSS et ITS générés à partir du cycle validé.</p></div>
+  </div>
+
+  <div class="rh-rolebar readonly" data-roles="gest_rh dir">
+    <span class="em-badge em-badge--neutral"><svg class="ico-sm"><use href="#i-eye"/></svg>Lecture seule</span>
+    <span>Consultation des déclarations. La génération et la transmission relèvent du responsable paie.</span>
+  </div>
+
+  <div class="decl-grid">
+    <!-- CNSS -->
+    <div class="decl">
+      <div class="decl-head">
+        <span class="decl-ic cnss"><svg class="ico-lg"><use href="#i-shieldcheck"/></svg></span>
+        <div><div class="tt">Déclaration CNSS — mai 2026</div><div class="st">Cotisations sociales · échéance 15 juin</div></div>
+        <span style="margin-left:auto" class="em-badge em-badge--warning"><span class="em-badge-dot"></span>À transmettre</span>
+      </div>
+      <div class="decl-body">
+        <div class="decl-line"><span class="k">Assiette cotisable (342 agents)</span><span class="v">187 600 000 F</span></div>
+        <div class="decl-line"><span class="k">Part salariale (3,6 %)</span><span class="v">6 753 600 F</span></div>
+        <div class="decl-line"><span class="k">Part patronale (16,4 %)</span><span class="v">30 766 400 F</span></div>
+        <div class="decl-line total"><span class="k"><b>Total à reverser CNSS</b></span><span class="v">37 520 000 F</span></div>
+      </div>
+      <div class="decl-foot" data-roles="paie admin">
+        <button class="em-btn em-btn--secondary" onclick="rhToast('Génération du bordereau CNSS (PDF)…')"><svg class="ico-sm"><use href="#i-download"/></svg>Bordereau PDF</button>
+        <button class="em-btn em-btn--secondary" onclick="rhToast('Export tableur CNSS…')"><svg class="ico-sm"><use href="#i-download"/></svg>Tableur</button>
+        <button class="em-btn em-btn--primary" onclick="rhToast('Déclaration CNSS transmise', true)" style="margin-left:auto"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Transmettre</button>
+      </div>
+    </div>
+
+    <!-- ITS -->
+    <div class="decl">
+      <div class="decl-head">
+        <span class="decl-ic its"><svg class="ico-lg"><use href="#i-megaphone"/></svg></span>
+        <div><div class="tt">Déclaration ITS — mai 2026</div><div class="st">Impôt sur traitements &amp; salaires · échéance 10 juin</div></div>
+        <span style="margin-left:auto" class="em-badge em-badge--success"><span class="em-badge-dot"></span>Transmise</span>
+      </div>
+      <div class="decl-body">
+        <div class="decl-line"><span class="k">Base imposable cumulée</span><span class="v">180 846 000 F</span></div>
+        <div class="decl-line"><span class="k">ITS retenu (barème progressif)</span><span class="v">14 646 000 F</span></div>
+        <div class="decl-line"><span class="k">Salariés concernés</span><span class="v">331</span></div>
+        <div class="decl-line total"><span class="k"><b>Total reversé à l'État</b></span><span class="v">14 646 000 F</span></div>
+      </div>
+      <div class="decl-foot">
+        <button class="em-btn em-btn--secondary" onclick="rhToast('Téléchargement de l\'état ITS (PDF)…')"><svg class="ico-sm"><use href="#i-download"/></svg>État PDF</button>
+        <button class="em-btn em-btn--secondary" onclick="rhToast('Téléchargement de l\'accusé de transmission…')"><svg class="ico-sm"><use href="#i-check"/></svg>Accusé de réception</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- États sociaux -->
+  <p class="rh-section-label">États sociaux &amp; registres</p>
+  <div class="rh-card" style="margin-bottom:var(--space-8)">
+    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération du registre des salaires…')"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-list"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Registre des salaires</div><div class="rh-row-meta">Document annuel obligatoire · exercice 2026</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
+    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération de la déclaration nominative…')"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-users"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Déclaration individuelle nominative (DISA)</div><div class="rh-row-meta">CNSS annuelle · récapitulatif par salarié</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
+    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération du récapitulatif annuel ITS…')"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-megaphone"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Récapitulatif annuel ITS</div><div class="rh-row-meta">État fiscal de fin d'exercice</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
+  </div>
+
+  <!-- Historique -->
+  <p class="rh-section-label">Historique des transmissions</p>
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Période</th><th>Déclaration</th><th class="em-cell-num">Montant</th><th>Transmise le</th><th>Statut</th></tr></thead>
+      <tbody>
+        {declarations.map((d) => {
+          const st = DECLARATION_STATUS[d.status];
+          return (
+            <tr>
+              <td><b>{d.label.split('—')[1]?.trim() ?? d.period}</b></td>
+              <td>{d.kind.toUpperCase()}</td>
+              <td class="em-cell-num num">{fcfa(d.amount)}</td>
+              <td>{issuedOn[d.id] ?? '—'}</td>
+              <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+</Layout>

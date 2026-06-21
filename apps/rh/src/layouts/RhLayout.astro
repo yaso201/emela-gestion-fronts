@@ -1,0 +1,115 @@
+---
+import '@emela/design-system/index.css';
+import '../styles/shell.css';
+import Sprite from '../components/Sprite.astro';
+import Icon from '../components/Icon.astro';
+
+interface Props {
+  title: string;
+  /** Clé de page active (ex. "cockpit", "personnel"). */
+  page?: string;
+}
+const { title, page = '' } = Astro.props;
+
+// Rôle par défaut (la persistance + le filtrage runtime sont gérés par shell.js).
+const DEFAULT_ROLE = 'gest_rh';
+
+const ROLES = [
+  { id: 'manager', label: 'Manager' },
+  { id: 'gest_rh', label: 'Gestionnaire RH' },
+  { id: 'paie', label: 'Responsable paie' },
+  { id: 'finance', label: 'Finance' },
+  { id: 'dir', label: 'Direction' },
+  { id: 'admin', label: 'Admin technique' },
+];
+
+// Navigation groupée — chaque item porte ses rôles autorisés (filtrés par shell.js).
+const NAV = [
+  { group: 'Pilotage', children: [
+    { item: 'Tableau de bord', icon: 'i-grid', page: 'cockpit', href: '/cockpit', roles: 'manager gest_rh dir admin' },
+  ]},
+  { group: 'Personnel', children: [
+    { item: 'Annuaire', icon: 'i-users', page: 'personnel', href: '/personnel', roles: 'gest_rh manager dir admin' },
+    { item: 'Contrats', icon: 'i-doc', page: 'contrats', href: '/contrats', roles: 'gest_rh paie dir admin' },
+    { item: 'Évaluations', icon: 'i-star', page: 'evaluations', href: '/evaluations', roles: 'manager gest_rh dir admin' },
+    { item: 'Séparations', icon: 'i-door', page: 'separations', href: '/separations', roles: 'gest_rh dir admin' },
+  ]},
+  { group: 'Paie', children: [
+    { item: 'Cycle de paie', icon: 'i-coins', page: 'paie', href: '/paie', roles: 'paie finance dir admin' },
+    { item: 'Validations', icon: 'i-shieldcheck', page: 'validation', href: '/validation', roles: 'manager finance dir admin', counter: '2' },
+    { item: 'Déclarations', icon: 'i-megaphone', page: 'declarations', href: '/declarations', roles: 'paie gest_rh dir admin' },
+  ]},
+  { group: 'Documents', children: [
+    { item: 'Modèles de documents', icon: 'i-stamp', page: 'modeles', href: '/modeles', roles: 'gest_rh paie dir admin' },
+  ]},
+  { group: 'Administration', children: [
+    { item: 'Paramètres', icon: 'i-sliders', page: 'parametres', href: '/parametres', roles: 'admin' },
+  ]},
+];
+
+type NavRow =
+  | { type: 'label'; label: string }
+  | { type: 'item'; item: string; icon: string; page: string; href: string; roles: string; counter?: string };
+const navRows: NavRow[] = [];
+for (const node of NAV) {
+  navRows.push({ type: 'label', label: node.group });
+  for (const c of node.children) navRows.push({ type: 'item', ...c });
+}
+---
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/assets/lanem-logo.webp" />
+    <title>{title}</title>
+  </head>
+  <body data-page={page} data-role={DEFAULT_ROLE}>
+    <Sprite />
+
+    <!-- Barre mobile (< 900px) -->
+    <div class="nav-mbar">
+      <button class="nav-burger" aria-label="Menu" data-nav-toggle><Icon name="i-list" /></button>
+      <span class="mark">emela<span>.</span></span>
+    </div>
+
+    <!-- Barre latérale (rendue côté serveur) -->
+    <aside class="nav-side">
+      <a class="nav-brand" href="/cockpit"><span class="mark">emela<span>.</span></span><span class="ctx">RH &amp; Paie</span></a>
+
+      <div class="nav-rolebox">
+        <div class="lbl"><span class="pill">Démo</span>Rôle actif</div>
+        <div class="nav-roleselect">
+          <span class="dot" id="rh-role-dot"></span>
+          <select id="rh-role-sel" aria-label="Rôle actif">
+            {ROLES.map((r) => <option value={r.id}>{r.label}</option>)}
+          </select>
+          <Icon name="i-caretdown" cls="ico-sm chev" />
+        </div>
+      </div>
+
+      <nav class="nav-scroll">
+        {navRows.map((row) => row.type === 'label' ? (
+          <div class="nav-grouplabel">{row.label}</div>
+        ) : (
+          <a class:list={["nav-item", { "is-active": row.page === page }]} data-page={row.page} data-roles={row.roles} href={row.href}>
+            <Icon name={row.icon} />
+            <span class="lbl">{row.item}</span>
+            {row.counter && <span class="em-counter">{row.counter}</span>}
+          </a>
+        ))}
+      </nav>
+
+      <div class="nav-user">
+        <span class="av">RH</span>
+        <span><span class="nm">Rachelle Houngbé</span><span class="rl">Gestionnaire RH</span></span>
+      </div>
+    </aside>
+
+    <div class="nav-scrim" data-nav-close></div>
+
+    <slot />
+
+    <script is:inline src="/scripts/shell.js"></script>
+  </body>
+</html>

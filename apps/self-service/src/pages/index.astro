@@ -1,0 +1,152 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import Card from '../components/Card.astro';
+import Drawer from '../components/Drawer.astro';
+import {
+  getEmployee, getLeaveBalances, getRequests, getColleagues, getNotifications,
+  REQUEST_STATUS, CATEGORY_ICON, REQUEST_CATEGORY, LEAVE_TONE, PRESENCE, pct,
+} from '@emela/shared/data';
+
+const emp = await getEmployee();
+const balances = await getLeaveBalances();
+const recent = (await getRequests()).slice(0, 3);
+const colleagues = await getColleagues();
+const notifications = await getNotifications();
+const mgrInitials = emp.manager.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+---
+<Layout title="Mon tableau de bord — Espace personnel emela" page="dashboard">
+<main class="hr-page">
+
+  <!-- Bandeau identité -->
+  <section class="hr-hero">
+    <div class="hr-hero-row">
+      <div class="hr-hero-av">{emp.initials}</div>
+      <div class="hr-hero-id">
+        <div class="greet">Bonjour {emp.firstName}</div>
+        <h2>{emp.name}</h2>
+        <div class="sub">{emp.position} · Département {emp.department} — {emp.faculty}</div>
+      </div>
+      <a class="em-btn em-btn--accent" data-drawer-open="drawer-conge" href="javascript:void(0)"><Icon name="i-plane" cls="ico-sm" />Demander un congé</a>
+    </div>
+    <div class="hr-hero-chips">
+      <div class="hr-hero-chip"><div class="k">Contrat</div><div class="v">{emp.contractType} · {emp.contractSince}</div></div>
+      <div class="hr-hero-chip"><div class="k">Profil de paie</div><div class="v">{emp.payProfile}</div></div>
+      <div class="hr-hero-chip"><div class="k">Matricule</div><div class="v"><code>{emp.matricule}</code></div></div>
+      <div class="hr-hero-chip"><div class="k">N° CNSS</div><div class="v"><code>{emp.cnss}</code></div></div>
+      <div class="hr-hero-chip"><div class="k">Manager direct</div><div class="v">{emp.manager}</div></div>
+    </div>
+  </section>
+
+  <!-- Accès rapides (services self-service) -->
+  <p class="hr-section-label">Accès rapides</p>
+  <section class="hr-services" style="margin-bottom: var(--space-9);">
+    <a class="hr-service" data-drawer-open="drawer-conge" href="javascript:void(0)">
+      <span class="hr-service-ic"><Icon name="i-plane" cls="ico" /></span>
+      <div><div class="hr-service-tx">Demander un congé</div><div class="hr-service-sub">Annuel, maladie, permission</div></div>
+    </a>
+    <a class="hr-service" href="/bulletins">
+      <span class="hr-service-ic"><Icon name="i-file" cls="ico" /></span>
+      <div><div class="hr-service-tx">Mes bulletins</div><div class="hr-service-sub">Consulter &amp; télécharger</div></div>
+    </a>
+    <a class="hr-service" href="/documents">
+      <span class="hr-service-ic"><Icon name="i-folder" cls="ico" /></span>
+      <div><div class="hr-service-tx">Mes documents RH</div><div class="hr-service-sub">Attestations, certificats</div></div>
+    </a>
+    <a class="hr-service" href="javascript:void(0)" onclick="hrToast('Ouverture du support RH…')">
+      <span class="hr-service-ic"><Icon name="i-chat" cls="ico" /></span>
+      <div><div class="hr-service-tx">Contacter les RH</div><div class="hr-service-sub">Poser une question</div></div>
+    </a>
+  </section>
+
+  <!-- Soldes de congés -->
+  <p class="hr-section-label">Mes soldes de congés <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-tertiary)">— au 16 juin 2026</span></p>
+  <section class="hr-leave-grid" style="margin-bottom: var(--space-9);">
+    {balances.map((b) => (
+      <div class="hr-leave">
+        <div class="hr-ring" style={`--p:${pct(b.remaining, b.total)}; --c:${LEAVE_TONE[b.tone].color}`}><b>{b.remaining}</b></div>
+        <div class="hr-leave-meta"><div class="lt">{b.label}</div><div class="lb"><b>{b.remaining}</b> j restants sur {b.total}</div></div>
+      </div>
+    ))}
+  </section>
+
+  <!-- Mon équipe -->
+  <p class="hr-section-label">Mon équipe — Département {emp.department}</p>
+  <section class="hr-grid-2" style="margin-bottom: var(--space-9);">
+    <Card title="Mes collègues" icon="i-users">
+      <Fragment slot="actions"><span style="font-size:var(--text-xs);color:var(--text-tertiary)">{colleagues.length} personnes</span></Fragment>
+      <div class="hr-list">
+        {colleagues.map((c) => (
+          <div class="hr-list-row">
+            <span class="hr-list-ic" style="border-radius:50%;background:var(--ink-100);color:var(--ink-800);font-weight:700;font-size:12px">{c.initials}</span>
+            <div class="hr-list-main"><div class="hr-list-tt">{c.name}</div><div class="hr-list-meta">{c.role}</div></div>
+            <div class="hr-list-side"><StatusBadge variant={PRESENCE[c.presence].variant}>{PRESENCE[c.presence].label}</StatusBadge></div>
+          </div>
+        ))}
+      </div>
+    </Card>
+    <Card title="Mon manager" icon="i-user">
+      <div style="padding:var(--space-7) var(--space-6);display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--space-3)">
+        <span style="width:60px;height:60px;border-radius:50%;background:var(--ink-100);color:var(--ink-800);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:20px">{mgrInitials}</span>
+        <div><div style="font-size:var(--text-base);font-weight:700">{emp.manager}</div><div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">Chef du département {emp.department}</div></div>
+        <StatusBadge variant="success" sm>Présent</StatusBadge>
+      </div>
+      <div style="padding:0 var(--space-6) var(--space-6)"><button class="em-btn em-btn--secondary" style="width:100%" onclick="hrToast('Message au manager…')"><Icon name="i-chat" cls="ico-sm" />Contacter mon manager</button></div>
+    </Card>
+  </section>
+
+  <!-- Deux colonnes : demandes récentes + notifications -->
+  <div class="hr-grid-2">
+    <Card title="Mes demandes récentes" icon="i-list">
+      <Fragment slot="actions"><a class="hr-card-link" href="/demandes">Tout voir<Icon name="i-caret" cls="ico-sm" /></a></Fragment>
+      <div class="hr-list">
+        {recent.map((r) => {
+          const st = REQUEST_STATUS[r.status];
+          return (
+            <a class="hr-list-row" href="/demandes">
+              <span class="hr-list-ic"><Icon name={CATEGORY_ICON[r.category]} cls="ico-sm" /></span>
+              <div class="hr-list-main"><div class="hr-list-tt">{r.subject}</div><div class="hr-list-meta">{REQUEST_CATEGORY[r.category].label} · {r.date}</div></div>
+              <div class="hr-list-side"><StatusBadge variant={st.variant}>{st.label}</StatusBadge></div>
+            </a>
+          );
+        })}
+      </div>
+    </Card>
+
+    <Card title="Notifications" icon="i-bell">
+      <div class="hr-list">
+        {notifications.map((n) => (
+          <div class="hr-list-row">
+            <span class:list={["hr-list-ic", n.tone !== 'none' && n.tone]}><Icon name={n.icon} cls="ico-sm" /></span>
+            <div class="hr-list-main"><div class="hr-list-tt">{n.title}</div><div class="hr-list-meta">{n.detail}</div></div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+
+</main>
+
+<!-- Drawer : demande de congé -->
+<div class="hr-scrim" id="hr-scrim"></div>
+<Drawer id="drawer-conge" title="Demander un congé" sub="Votre demande sera transmise à votre manager pour validation.">
+  <div class="em-field">
+    <label class="em-field-label" for="dc-type">Type de congé</label>
+    <select class="em-select" id="dc-type">
+      {balances.map((b) => <option>{b.label} — {b.remaining} j restants</option>)}
+    </select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+    <div class="em-field"><label class="em-field-label" for="dc-from">Du</label><input class="em-input" id="dc-from" type="date" value="2026-08-10" /></div>
+    <div class="em-field"><label class="em-field-label" for="dc-to">Au</label><input class="em-input" id="dc-to" type="date" value="2026-08-14" /></div>
+  </div>
+  <div class="em-alert em-alert--info"><span class="em-alert-icon"><Icon name="i-clock" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text"><b>5 jours ouvrés</b> seront décomptés de votre solde de congé annuel.</span></div></div>
+  <div class="em-field"><label class="em-field-label" for="dc-note">Motif / commentaire <span style="font-weight:400;color:var(--text-tertiary)">(optionnel)</span></label><textarea class="em-textarea" id="dc-note" placeholder="Précisez si nécessaire…"></textarea></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande de congé transmise', true);">Envoyer la demande</button>
+  </Fragment>
+</Drawer>
+
+</Layout>

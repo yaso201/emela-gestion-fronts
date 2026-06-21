@@ -1,0 +1,154 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import Drawer from '../components/Drawer.astro';
+import { getEvaluations } from '@emela/shared/data';
+
+const evals = await getEvaluations();
+const ev = evals[0];
+const scoreNum = ev.score.split('/')[0];
+---
+<Layout title="Mes évaluations — Espace personnel emela" page="evaluations">
+<style is:global>
+  .flow { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+  .flow-step { flex:1; min-width:140px; display:flex; flex-direction:column; gap:var(--space-3); padding:var(--space-4) var(--space-5); border-radius:var(--radius-md); background:var(--sand-50); border:1px solid var(--border-subtle); }
+  .flow-step.done { background:var(--success-50); border-color:var(--success-100); }
+  .flow-step.cur { background:var(--ink-50); border-color:var(--ink-200); }
+  .flow-step .n { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--text-tertiary); }
+  .flow-step .ck { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--sand-200); color:var(--sand-500); flex-shrink:0; }
+  .flow-step.done .ck { background:var(--success-500); color:#fff; }
+  .flow-step.cur .ck { background:var(--ink-800); color:#fff; }
+  .flow-step .lbl { font-size:var(--text-sm); font-weight:600; color:var(--text-primary); }
+  .flow-step .sub { font-size:var(--text-xs); color:var(--text-tertiary); }
+  @media (max-width:760px){ .flow { flex-direction:column; } }
+
+  .comp { display:flex; align-items:center; gap:var(--space-5); padding:var(--space-5) 0; border-top:1px solid var(--border-subtle); }
+  .comp:first-child { border-top:0; }
+  .comp .nm { flex:1; min-width:0; }
+  .comp .nm .t { font-size:var(--text-sm); font-weight:600; }
+  .comp .nm .d { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+  .scale { display:flex; gap:4px; flex-shrink:0; }
+  .scale button { width:34px; height:34px; border:1px solid var(--border-default); background:var(--surface-paper); border-radius:var(--radius-sm); font-size:var(--text-sm); font-weight:600; color:var(--text-secondary); cursor:pointer; transition:all var(--duration-fast) var(--ease-out); }
+  .scale button:hover { border-color:var(--ink-600); }
+  .scale button.on { background:var(--ink-800); border-color:var(--ink-800); color:#fff; }
+  .obj-row { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-top:1px solid var(--border-subtle); }
+  .obj-row:first-child { border-top:0; }
+  .obj-row .t { flex:1; font-size:var(--text-sm); }
+  .scoreboard { display:flex; align-items:center; gap:var(--space-5); }
+  .score-big { font-family:var(--font-display); font-size:40px; font-weight:800; letter-spacing:-.02em; line-height:1; }
+  .score-big span { font-size:var(--text-md); color:var(--text-tertiary); font-weight:500; }
+</style>
+
+<main class="hr-page">
+  <PageHead title="Mes évaluations" sub="Entretien annuel d'évaluation — préparez votre auto-évaluation, consultez et validez vos comptes-rendus." />
+
+  <!-- Campagne en cours -->
+  <Card title="Entretien annuel 2026" icon="i-star" style="margin-bottom:var(--space-6)">
+    <Fragment slot="actions"><StatusBadge variant="warning">Auto-évaluation à compléter</StatusBadge></Fragment>
+    <div style="padding:var(--space-7)">
+      <div class="flow">
+        <div class="flow-step cur"><div class="n"><span class="ck">1</span>Avant</div><div class="lbl">Auto-évaluation</div><div class="sub">À compléter avant le 30 juin</div></div>
+        <div class="flow-step"><div class="n"><span class="ck">2</span>Pendant</div><div class="lbl">Entretien</div><div class="sub">À planifier avec le manager</div></div>
+        <div class="flow-step"><div class="n"><span class="ck">3</span>Après</div><div class="lbl">Compte-rendu</div><div class="sub">Synthèse du manager</div></div>
+        <div class="flow-step"><div class="n"><span class="ck">4</span>Signature</div><div class="lbl">Ma validation</div><div class="sub">Contresignature</div></div>
+      </div>
+      <div class="em-alert em-alert--info" style="margin-top:var(--space-6)">
+        <span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span>
+        <div class="em-alert-body"><span class="em-alert-text">Votre manager <b>Sylvain Dossou</b> prépare l'entretien à partir de votre auto-évaluation. Complétez-la puis soumettez-la.</span></div>
+      </div>
+    </div>
+  </Card>
+
+  <!-- Auto-évaluation -->
+  <p class="hr-section-label">Mon auto-évaluation 2026 <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-tertiary)">— brouillon enregistré le 14 juin</span></p>
+  <Card title="Compétences — auto-positionnement (1 à 5)" style="margin-bottom:var(--space-6)">
+    <div style="padding:var(--space-3) var(--space-6) var(--space-6)">
+      <div class="comp"><div class="nm"><div class="t">Expertise &amp; qualité pédagogique</div><div class="d">Maîtrise disciplinaire, encadrement</div></div><div class="scale" data-scale></div></div>
+      <div class="comp"><div class="nm"><div class="t">Production scientifique</div><div class="d">Publications, communications</div></div><div class="scale" data-scale></div></div>
+      <div class="comp"><div class="nm"><div class="t">Esprit d'équipe &amp; collaboration</div><div class="d">Coopération, partage</div></div><div class="scale" data-scale></div></div>
+      <div class="comp"><div class="nm"><div class="t">Autonomie &amp; organisation</div><div class="d">Priorisation, fiabilité</div></div><div class="scale" data-scale></div></div>
+      <div class="comp"><div class="nm"><div class="t">Communication</div><div class="d">Clarté, écoute</div></div><div class="scale" data-scale></div></div>
+    </div>
+  </Card>
+
+  <Card title="Bilan de mes objectifs 2025" style="margin-bottom:var(--space-6)">
+    <div style="padding:var(--space-3) var(--space-6) var(--space-6)">
+      <div class="obj-row"><div class="t">Publier 2 articles dans des revues à comité de lecture</div><StatusBadge variant="success">Atteint</StatusBadge></div>
+      <div class="obj-row"><div class="t">Encadrer 3 mémoires de master</div><StatusBadge variant="warning">Partiellement</StatusBadge></div>
+      <div class="obj-row"><div class="t">Refonte du module « Algorithmique avancée »</div><StatusBadge variant="success">Atteint</StatusBadge></div>
+    </div>
+  </Card>
+
+  <Card title="Mon ressenti & mes souhaits" style="margin-bottom:var(--space-6)">
+    <div style="padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-6)">
+      <div class="em-field"><label class="em-field-label">Mes réalisations marquantes</label><textarea class="em-textarea" placeholder="Décrivez vos réussites de l'année…">Mise en place du nouveau parcours d'algorithmique, encadrement de 2 mémoires soutenus avec mention.</textarea></div>
+      <div class="em-field"><label class="em-field-label">Mes axes d'amélioration</label><textarea class="em-textarea" placeholder="Ce que je souhaite améliorer…"></textarea></div>
+      <div class="em-field"><label class="em-field-label">Souhaits de formation / mobilité</label><textarea class="em-textarea" placeholder="Formations, évolution souhaitée…"></textarea></div>
+    </div>
+    <div style="padding:var(--space-5) var(--space-6);border-top:1px solid var(--border-subtle);display:flex;gap:var(--space-3);justify-content:flex-end;flex-wrap:wrap">
+      <button class="em-btn em-btn--secondary" onclick="hrToast('Brouillon enregistré', true)">Enregistrer le brouillon</button>
+      <button class="em-btn em-btn--primary" onclick="hrToast('Auto-évaluation transmise à votre manager', true)"><Icon name="i-arrowright" cls="ico-sm" />Soumettre à mon manager</button>
+    </div>
+  </Card>
+
+  <!-- Historique -->
+  <p class="hr-section-label">Évaluations passées</p>
+  <Card>
+    <div class="hr-list">
+      {evals.map((e) => (
+        <div class="hr-list-row">
+          <span class="hr-list-ic" style="background:var(--success-50);color:var(--success-700)"><Icon name="i-star" cls="ico-sm" /></span>
+          <div class="hr-list-main"><div class="hr-list-tt">{e.title}</div><div class="hr-list-meta">Note globale {e.score} · validée le {e.validatedOn}</div></div>
+          <div class="hr-list-side"><StatusBadge variant="success" sm>Validée</StatusBadge><button class="em-btn em-btn--secondary em-btn--sm" data-drawer-open="drawer-eval">Consulter</button></div>
+        </div>
+      ))}
+    </div>
+  </Card>
+</main>
+
+<!-- Drawer : consulter une évaluation -->
+<div class="hr-scrim" id="hr-scrim"></div>
+<Drawer id="drawer-eval" title={`Entretien annuel ${ev.year}`} sub={`Évaluateur : ${ev.evaluator} · entretien du ${ev.interviewDate}`} style="max-width:520px">
+    <div class="scoreboard">
+      <div class="score-big">{scoreNum}<span>/5</span></div>
+      <div style="font-size:var(--text-sm);color:var(--text-secondary)">Note globale — performance <b style="color:var(--text-primary)">{ev.performance}</b></div>
+    </div>
+    <div>
+      <div class="hr-section-label">Compétences évaluées</div>
+      {ev.competences.map((c) => (
+        <div class="obj-row"><div class="t">{c.label}</div><b class="num">{c.score}</b></div>
+      ))}
+    </div>
+    <div>
+      <div class="hr-section-label">Synthèse du manager</div>
+      <p style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.6;margin:0">{ev.managerSummary}</p>
+    </div>
+    <div>
+      <div class="hr-section-label">Objectifs fixés</div>
+      {ev.objectives.map((o) => <div class="obj-row"><div class="t">{o}</div></div>)}
+    </div>
+    <div class="em-alert em-alert--success" style="margin:0"><span class="em-alert-icon"><Icon name="i-check" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text">Vous avez <b>contresigné</b> ce compte-rendu le {ev.countersignedOn}.</span></div></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Fermer</button>
+    <button class="em-btn em-btn--primary" onclick="hrToast('Compte-rendu téléchargé…')"><Icon name="i-download" cls="ico-sm" />Télécharger</button></Fragment>
+</Drawer>
+<script is:inline>
+  // Échelle de compétences 1–5 (auto-positionnement). Pré-rempli pour la démo.
+  var preset = [4, 3, 4, 4, 3];
+  document.querySelectorAll('[data-scale]').forEach(function (sc, idx) {
+    for (var i = 1; i <= 5; i++) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = i; b.setAttribute('data-v', i);
+      if (i === preset[idx]) b.classList.add('on');
+      sc.appendChild(b);
+    }
+    sc.addEventListener('click', function (e) {
+      var btn = e.target.closest('button'); if (!btn) return;
+      sc.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === btn); });
+    });
+  });
+</script>
+
+</Layout>

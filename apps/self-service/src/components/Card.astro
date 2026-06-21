@@ -1,0 +1,26 @@
+---
+import Icon from './Icon.astro';
+
+// Carte de contenu (.hr-card) avec en-tête optionnel.
+// L'en-tête s'affiche si un `title` est fourni ou si le slot "actions" est rempli.
+interface Props {
+  title?: string;
+  /** icône d'en-tête, ex. "i-user" */
+  icon?: string;
+  /** classes additionnelles sur la carte */
+  class?: string;
+  /** style inline optionnel (ex. marge) */
+  style?: string;
+}
+const { title, icon, class: extra, style } = Astro.props;
+const hasHead = !!title || Astro.slots.has('actions');
+---
+<div class:list={["hr-card", extra]} style={style}>
+  {hasHead && (
+    <div class="hr-card-head">
+      <span class="hr-card-title">{icon && <Icon name={icon} cls="ico-sm" style="color:var(--text-tertiary)" />}{title}</span>
+      <slot name="actions" />
+    </div>
+  )}
+  <slot />
+</div>

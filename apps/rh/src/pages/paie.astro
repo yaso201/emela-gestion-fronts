@@ -1,0 +1,159 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getPayrollRuns, getPayrollSlips, PAYROLL_STATUS, periodLabel, fcfa, fcfaShort } from '@emela/shared/rh-data';
+
+const runs = await getPayrollRuns();
+// Cycle « en cours » : le plus récent hors préparation (sinon le 1er).
+const current = runs.find((r) => r.status !== 'Preparation') ?? runs[0];
+const slips = await getPayrollSlips(current.id);
+const curStatus = PAYROLL_STATUS[current.status];
+const curLabel = periodLabel(current.periodMonth, current.periodYear);
+const totalDeductions = current.totalGross - current.totalNet;
+const employerCharges = current.totalEmployerCost - current.totalGross;
+const history = runs.filter((r) => r.id !== current.id && r.status !== 'Preparation');
+---
+<Layout title="Cycle de paie — emela RH" page="paie">
+<style is:global>
+  .run-card { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:var(--space-7); margin-bottom:var(--space-7); }
+  .run-top { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-5); flex-wrap:wrap; margin-bottom:var(--space-7); }
+  .run-top h2 { font-family:var(--font-display); font-size:var(--text-xl); font-weight:700; margin:0; }
+  .run-top .meta { font-size:var(--text-sm); color:var(--text-secondary); margin-top:var(--space-2); }
+  /* Stepper workflow */
+  .flow { display:flex; gap:var(--space-2); flex-wrap:wrap; }
+  .flow-step { flex:1; min-width:130px; display:flex; flex-direction:column; gap:var(--space-3); padding:var(--space-4) var(--space-5); border-radius:var(--radius-md); background:var(--sand-50); border:1px solid var(--border-subtle); }
+  .flow-step.done { background:var(--success-50); border-color:var(--success-100); }
+  .flow-step.cur { background:var(--ink-50); border-color:var(--ink-200); }
+  .flow-step .n { display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.06em; font-weight:700; color:var(--text-tertiary); }
+  .flow-step .ck { width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--sand-200); color:var(--sand-500); flex-shrink:0; }
+  .flow-step.done .ck { background:var(--success-500); color:#fff; }
+  .flow-step.cur .ck { background:var(--ink-800); color:#fff; }
+  .flow-step .lbl { font-size:var(--text-sm); font-weight:600; color:var(--text-primary); }
+  .flow-step .sub { font-size:var(--text-xs); color:var(--text-tertiary); }
+  @media (max-width:760px){ .flow { flex-direction:column; } }
+  .emp-name { display:flex; align-items:center; gap:var(--space-3); }
+  .emp-av { width:30px; height:30px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0; }
+  @media (max-width:900px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Cycle de paie</h1><p class="sub">Préparation et édition de la paie mensuelle · 342 agents.</p></div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--secondary" data-roles="paie admin" data-drawer-open="drawer-run"><svg class="ico-sm"><use href="#i-plus"/></svg>Nouveau cycle</button>
+    </div>
+  </div>
+
+  <div class="rh-rolebar readonly" data-roles="finance dir">
+    <span class="em-badge em-badge--neutral"><svg class="ico-sm"><use href="#i-eye"/></svg>Lecture seule</span>
+    <span>Consultation du cycle. La préparation et l'édition relèvent du responsable paie ; la validation se fait depuis l'onglet Validations.</span>
+  </div>
+
+  <!-- Cycle en cours -->
+  <div class="run-card">
+    <div class="run-top">
+      <div>
+        <h2>Cycle — {curLabel}</h2>
+        <div class="meta">Période du 1<sup>er</sup> au 31 {curLabel.split(' ')[0].toLowerCase()} · <span class="num">{current.slipCount}</span> bulletins générés · réf. <span class="num" style="font-size:var(--text-xs)">{current.id}</span></div>
+      </div>
+      <div style="display:flex;gap:var(--space-3);flex-wrap:wrap;align-items:center">
+        <span class:list={["em-badge", `em-badge--${curStatus.variant}`, "em-badge--lg"]}><span class="em-badge-dot"></span>{curStatus.label}</span>
+        <button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin" onclick="rhToast('Recalcul du cycle lancé…')"><svg class="ico-sm"><use href="#i-refresh"/></svg>Recalculer</button>
+      </div>
+    </div>
+
+    <div class="flow">
+      <div class="flow-step done"><div class="n"><span class="ck"><svg class="ico-sm"><use href="#i-check"/></svg></span>Étape 1</div><div class="lbl">Préparation</div><div class="sub">Salariés &amp; rubriques</div></div>
+      <div class="flow-step done"><div class="n"><span class="ck"><svg class="ico-sm"><use href="#i-check"/></svg></span>Étape 2</div><div class="lbl">Bulletins générés</div><div class="sub">342 · 31 mai</div></div>
+      <div class="flow-step cur"><div class="n"><span class="ck">3</span>Étape 3</div><div class="lbl">Validation finance</div><div class="sub">En attente</div></div>
+      <div class="flow-step"><div class="n"><span class="ck">4</span>Étape 4</div><div class="lbl">Validation direction</div><div class="sub">—</div></div>
+      <div class="flow-step"><div class="n"><span class="ck">5</span>Étape 5</div><div class="lbl">Transmis compta</div><div class="sub">Vers UF</div></div>
+    </div>
+
+    <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6);flex-wrap:wrap" data-roles="paie admin">
+      <button class="em-btn em-btn--primary" onclick="rhToast('Cycle transmis en validation finance', true)"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Relancer la validation finance</button>
+      <button class="em-btn em-btn--secondary" onclick="rhToast('Export du journal de paie…')"><svg class="ico-sm"><use href="#i-download"/></svg>Journal de paie</button>
+    </div>
+  </div>
+
+  <!-- Agrégats -->
+  <section class="rh-grid-4" style="margin-bottom:var(--space-7)">
+    <div class="em-kpi"><span class="em-kpi-label">Masse brute</span><span class="em-kpi-value num">{fcfaShort(current.totalGross)}</span><span class="em-kpi-meta">{current.slipCount} bulletins</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Total net versé</span><span class="em-kpi-value num">{fcfaShort(current.totalNet)}</span><span class="em-kpi-meta">virements salaires</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Charges patronales</span><span class="em-kpi-value num">{fcfaShort(employerCharges)}</span><span class="em-kpi-meta">CNSS employeur</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Coût employeur</span><span class="em-kpi-value num">{fcfaShort(current.totalEmployerCost)}</span><span class="em-kpi-trend em-kpi-trend--up"><svg class="ico-sm"><use href="#i-trendup"/></svg>+2,1 % vs avril</span></div>
+  </section>
+
+  <!-- Bulletins du cycle -->
+  <div class="em-table-wrap">
+    <div class="em-table-toolbar">
+      <span class="em-table-title">Bulletins du cycle</span>
+      <div style="display:flex;gap:var(--space-3);align-items:center">
+        <span class="em-table-meta">342 bulletins · 2 écarts &gt; 10 %</span>
+        <button class="em-btn em-btn--ghost em-btn--sm"><svg class="ico-sm"><use href="#i-filter"/></svg>Filtrer</button>
+      </div>
+    </div>
+    <table class="em-table">
+      <thead><tr><th>Salarié</th><th class="em-cell-num">Brut</th><th class="em-cell-num hide-md">Retenues</th><th class="em-cell-num">Net</th><th class="hide-md">Écart M-1</th><th>Statut</th><th style="text-align:right">Action</th></tr></thead>
+      <tbody>
+        {slips.map((s) => {
+          const deductions = s.cnssEmployee + s.itsAmount + s.otherDeductions;
+          return (
+            <tr>
+              <td><div class="emp-name"><span class="emp-av">{s.employeeName.split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>{s.employeeName}</div></td>
+              <td class="em-cell-num num">{fcfa(s.grossSalary)}</td>
+              <td class="em-cell-num num hide-md">{fcfa(deductions)}</td>
+              <td class="em-cell-num num"><b>{fcfa(s.netSalary)}</b></td>
+              <td class="hide-md"><span class="em-badge em-badge--neutral em-badge--sm">=</span></td>
+              <td><StatusBadge variant="success" sm>Calculé</StatusBadge></td>
+              <td style="text-align:right"><a class="em-btn em-btn--secondary em-btn--sm" href={`/bulletin?id=${s.id}`}>Voir</a></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    <div class="em-pagination">
+      <button class="em-pagination-btn" aria-current="page">1</button><button class="em-pagination-btn">2</button><button class="em-pagination-btn">3</button><span style="color:var(--text-tertiary);padding:0 var(--space-3)">…</span><button class="em-pagination-btn">57</button>
+      <button class="em-pagination-btn" aria-label="Suivant"><svg class="ico-sm"><use href="#i-caret"/></svg></button>
+    </div>
+  </div>
+
+  <!-- Historique cycles -->
+  <p class="rh-section-label" style="margin-top:var(--space-9)">Cycles précédents</p>
+  <div class="rh-card">
+    {history.map((r) => {
+      const st = PAYROLL_STATUS[r.status];
+      const transmitted = r.status === 'Transmise ERPNext';
+      return (
+        <a class="rh-row" href="javascript:void(0)" onclick={`rhToast('Ouverture du cycle ${periodLabel(r.periodMonth, r.periodYear)}…')`}>
+          <span class="rh-row-av" style={transmitted ? 'background:var(--success-50);color:var(--success-700)' : 'background:var(--sand-100);color:var(--sand-700)'}><svg class="ico-sm"><use href={transmitted ? '#i-check' : '#i-clock'}/></svg></span>
+          <div class="rh-row-main"><div class="rh-row-tt">{periodLabel(r.periodMonth, r.periodYear)}</div><div class="rh-row-meta">{r.slipCount} bulletins · coût employeur {fcfaShort(r.totalEmployerCost)}</div></div>
+          <span class:list={["em-badge", `em-badge--${st.variant}`, "em-badge--sm"]}><span class="em-badge-dot"></span>{st.label}</span>
+        </a>
+      );
+    })}
+  </div>
+</main>
+
+<!-- Drawer nouveau cycle -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<aside class="rh-drawer" id="drawer-run" role="dialog" aria-modal="true" aria-labelledby="dr-title">
+  <div class="rh-drawer-head">
+    <div><h3 id="dr-title">Nouveau cycle de paie</h3><p>Un cycle par mois. Les bulletins se génèrent après création.</p></div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="rh-drawer-body">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+      <div class="em-field"><label class="em-field-label">Mois</label><select class="em-select"><option>Juin</option><option>Juillet</option></select></div>
+      <div class="em-field"><label class="em-field-label">Année</label><input class="em-input" value="2026" /></div>
+    </div>
+    <div class="em-field"><label class="em-field-label">Périmètre</label><select class="em-select"><option>Tous les agents actifs (342)</option><option>Enseignants-chercheurs</option><option>Personnel administratif</option></select></div>
+    <div class="em-alert em-alert--info"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Les taux CNSS/ITS et le SMIG appliqués proviennent des <b>paramètres de paie</b> en vigueur.</span></div></div>
+  </div>
+  <div class="rh-drawer-foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Cycle de juin créé', true);">Créer le cycle</button>
+  </div>
+</aside>
+
+</Layout>

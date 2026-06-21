@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import Drawer from '../components/Drawer.astro';
+import { getEmployee } from '@emela/shared/data';
+
+const emp = await getEmployee();
+---
+<Layout title="Mon profil — Espace personnel emela" page="profil">
+<style>
+  .dl { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5) var(--space-6); padding:var(--space-6); }
+  @media (max-width:560px){ .dl { grid-template-columns:1fr; } }
+  .dl .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.07em; color:var(--text-tertiary); font-weight:600; }
+  .dl .v { font-size:var(--text-sm); font-weight:500; color:var(--text-primary); margin-top:3px; }
+  .dl .v.mono { font-family:var(--font-mono); }
+  .dl .full { grid-column:1 / -1; }
+</style>
+
+<main class="hr-page hr-page--narrow">
+  <PageHead title="Mon profil" sub="Vos informations personnelles et vos paramètres de compte." />
+
+  <!-- Identité (gérée RH) -->
+  <Card title="Identité" icon="i-user" style="margin-bottom:var(--space-6)">
+    <span slot="actions" class="em-badge em-badge--neutral em-badge--sm"><Icon name="i-lock" cls="ico-sm" />Gérée par les RH</span>
+    <div class="dl">
+      <div><div class="k">Nom complet</div><div class="v">{emp.name}</div></div>
+      <div><div class="k">Matricule</div><div class="v mono">{emp.matricule}</div></div>
+      <div><div class="k">Date de naissance</div><div class="v">{emp.birthDate}</div></div>
+      <div><div class="k">Situation familiale</div><div class="v">{emp.familyStatus}</div></div>
+      <div><div class="k">Poste</div><div class="v">{emp.position}</div></div>
+      <div><div class="k">Département</div><div class="v">{emp.department}</div></div>
+    </div>
+  </Card>
+
+  <!-- Coordonnées (modifiables sur demande) -->
+  <Card title="Mes coordonnées" icon="i-chat" style="margin-bottom:var(--space-6)">
+    <button slot="actions" class="em-btn em-btn--secondary em-btn--sm" data-drawer-open="drawer-coord"><Icon name="i-pencil" cls="ico-sm" />Demander une modification</button>
+    <div class="dl">
+      <div class="full"><div class="k">E-mail professionnel</div><div class="v mono">{emp.proEmail}</div></div>
+      <div><div class="k">E-mail personnel</div><div class="v mono">{emp.personalEmail}</div></div>
+      <div><div class="k">Téléphone</div><div class="v mono">{emp.phone}</div></div>
+      <div class="full"><div class="k">Adresse</div><div class="v">{emp.address}</div></div>
+      <div><div class="k">Contact d'urgence</div><div class="v">{emp.emergencyContact}</div></div>
+    </div>
+  </Card>
+
+  <!-- Sécurité -->
+  <Card title="Sécurité du compte" icon="i-shield" style="margin-bottom:var(--space-6)">
+    <div class="hr-list">
+      <div class="hr-list-row">
+        <span class="hr-list-ic"><Icon name="i-key" cls="ico-sm" /></span>
+        <div class="hr-list-main"><div class="hr-list-tt">Mot de passe</div><div class="hr-list-meta">Dernière modification il y a 4 mois</div></div>
+        <div class="hr-list-side"><button class="em-btn em-btn--secondary em-btn--sm" data-drawer-open="drawer-pwd">Changer</button></div>
+      </div>
+      <div class="hr-list-row">
+        <span class="hr-list-ic"><Icon name="i-shield" cls="ico-sm" /></span>
+        <div class="hr-list-main"><div class="hr-list-tt">Double authentification</div><div class="hr-list-meta">Renforce la sécurité de votre compte</div></div>
+        <div class="hr-list-side"><label class="em-switch"><input class="em-switch-input" type="checkbox" onchange="hrToast(this.checked ? '2FA activée' : '2FA désactivée', this.checked)" /></label></div>
+      </div>
+    </div>
+  </Card>
+
+  <!-- Préférences -->
+  <Card title="Préférences" icon="i-bell">
+    <div class="hr-list">
+      <div class="hr-list-row">
+        <div class="hr-list-main"><div class="hr-list-tt">Langue de l'interface</div></div>
+        <div class="hr-list-side"><select class="em-select" style="max-width:160px"><option>Français</option><option>English</option></select></div>
+      </div>
+      <div class="hr-list-row">
+        <div class="hr-list-main"><div class="hr-list-tt">Notifications par e-mail</div><div class="hr-list-meta">Bulletins, décisions de congé</div></div>
+        <div class="hr-list-side"><label class="em-switch"><input class="em-switch-input" type="checkbox" checked /></label></div>
+      </div>
+    </div>
+  </Card>
+</main>
+
+<!-- Voile partagé des tiroirs -->
+<div class="hr-scrim" id="hr-scrim"></div>
+
+<!-- Tiroir : changer mot de passe -->
+<Drawer id="drawer-pwd" title="Changer mon mot de passe" sub="Au moins 10 caractères, dont une majuscule et un chiffre.">
+  <div class="em-field"><label class="em-field-label" for="pw-old">Mot de passe actuel</label><input class="em-input" id="pw-old" type="password" placeholder="••••••••" /></div>
+  <div class="em-field"><label class="em-field-label" for="pw-new">Nouveau mot de passe</label><input class="em-input" id="pw-new" type="password" placeholder="••••••••" /></div>
+  <div class="em-field"><label class="em-field-label" for="pw-conf">Confirmer le nouveau mot de passe</label><input class="em-input" id="pw-conf" type="password" placeholder="••••••••" /></div>
+  <div class="em-alert em-alert--info"><span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text">Vous serez déconnecté de vos autres sessions après le changement.</span></div></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Mot de passe mis à jour', true);">Mettre à jour</button>
+  </Fragment>
+</Drawer>
+
+<!-- Tiroir : modification coordonnées -->
+<Drawer id="drawer-coord" title="Demande de modification" sub="La demande est transmise aux RH pour traçabilité.">
+  <div class="em-field"><label class="em-field-label">E-mail personnel</label><input class="em-input" type="email" value={emp.personalEmail} /></div>
+  <div class="em-field"><label class="em-field-label">Téléphone</label><input class="em-input" value={emp.phone} /></div>
+  <div class="em-field"><label class="em-field-label">Adresse</label><input class="em-input" value={emp.address} /></div>
+  <div class="em-field"><label class="em-field-label">Motif <span style="font-weight:400;color:var(--text-tertiary)">(optionnel)</span></label><textarea class="em-textarea" placeholder="ex. déménagement…"></textarea></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande de modification transmise aux RH', true);">Envoyer la demande</button>
+  </Fragment>
+</Drawer>
+
+</Layout>

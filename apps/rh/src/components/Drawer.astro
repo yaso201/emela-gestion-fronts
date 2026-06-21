@@ -1,0 +1,25 @@
+---
+import Icon from './Icon.astro';
+
+// Tiroir latéral (.rh-drawer). Corps = slot par défaut, pied = slot "foot".
+// Ouverture/fermeture via shell.js (data-drawer-open / data-drawer-close).
+interface Props {
+  id: string;
+  title: string;
+  sub?: string;
+  style?: string;
+  class?: string;
+}
+const { id, title, sub, style, class: extra } = Astro.props;
+---
+<aside class:list={["rh-drawer", extra]} id={id} role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} style={style}>
+  <div class="rh-drawer-head">
+    <div>
+      <h3 id={`${id}-title`}>{title}</h3>
+      {sub && <p>{sub}</p>}
+    </div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><Icon name="i-x" /></button>
+  </div>
+  <div class="rh-drawer-body"><slot /></div>
+  <div class="rh-drawer-foot"><slot name="foot" /></div>
+</aside>

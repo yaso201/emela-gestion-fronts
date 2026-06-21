@@ -1,0 +1,119 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getContracts, CONTRACT_STATUS, CONTRACT_TYPE, fcfa } from '@emela/shared/rh-data';
+
+const contracts = await getContracts();
+const CONTRACT_VARIANT: Record<string, string> = { CDI: 'info', CDD: 'accent', 'Temps partiel': 'neutral', Apprentissage: 'neutral', Etranger: 'neutral' };
+const fmtDate = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR') : '—';
+const period = (c: typeof contracts[number]) => c.endDate ? `${fmtDate(c.startDate)} → ${fmtDate(c.endDate)}` : `depuis ${fmtDate(c.startDate)}`;
+const active = contracts.filter((c) => c.status === 'Actif').length;
+const drafts = contracts.filter((c) => c.status === 'Brouillon').length;
+---
+<Layout title="Contrats — emela RH" page="contrats">
+<style is:global>
+  .emp-name { display:flex; align-items:center; gap:var(--space-4); }
+  .emp-av { width:32px; height:32px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:11px; flex-shrink:0; }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  @media (max-width:900px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Contrats</h1><p class="sub">Contrats de travail localisés — CDI, CDD, étranger, apprentissage.</p></div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--primary" data-roles="gest_rh admin" data-drawer-open="drawer-ctr"><svg class="ico-sm"><use href="#i-plus"/></svg>Créer un contrat</button>
+    </div>
+  </div>
+
+  <div class="rh-rolebar readonly" data-roles="paie dir">
+    <span class="em-badge em-badge--neutral"><svg class="ico-sm"><use href="#i-eye"/></svg>Lecture seule</span>
+    <span>Consultation des contrats. La création et le renouvellement relèvent du gestionnaire RH.</span>
+  </div>
+
+  <section class="rh-grid-4" style="margin-bottom:var(--space-7)">
+    <div class="em-kpi"><span class="em-kpi-label">Contrats actifs</span><span class="em-kpi-value num">{active}</span><span class="em-kpi-meta">CDI · CDD · étranger</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">CDD à échéance (90 j)</span><span class="em-kpi-value num" style="color:var(--warning-700)">3</span><span class="em-kpi-meta">à renouveler ou clôturer</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">En période d'essai</span><span class="em-kpi-value num">11</span><span class="em-kpi-meta">dont 2 fin ce mois</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Brouillons</span><span class="em-kpi-value num">{drafts}</span><span class="em-kpi-meta">à finaliser</span></div>
+  </section>
+
+  <div class="em-alert em-alert--warning" style="margin-bottom:var(--space-6)">
+    <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span>
+    <div class="em-alert-body"><div class="em-alert-title">3 contrats arrivent à échéance dans les 90 jours</div><span class="em-alert-text">G. Fanou (31 août), I. Bio Tchané (30 sept.) et un CDD du département Scolarité. Renouveler ou initier la clôture.</span></div>
+  </div>
+
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Salarié</th><th>Référence</th><th>Type</th><th class="hide-md">Période</th><th class="em-cell-num hide-md">Salaire base</th><th>Statut</th><th style="text-align:right">Action</th></tr></thead>
+      <tbody>
+        {contracts.map((c) => {
+          const st = CONTRACT_STATUS[c.status];
+          return (
+            <tr>
+              <td><div class="emp-name"><span class="emp-av">{c.employeeName.split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>{c.employeeName}</div></td>
+              <td class="mono-sm">{c.id}</td><td><span class:list={["em-badge", `em-badge--${CONTRACT_VARIANT[c.contractType]}`, "em-badge--sm"]}>{CONTRACT_TYPE[c.contractType]}</span></td>
+              <td class="hide-md">{period(c)}</td><td class="em-cell-num num hide-md">{fcfa(c.baseSalary)}</td>
+              <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
+              <td style="text-align:right"><button class="em-btn em-btn--secondary em-btn--sm" data-drawer-open="drawer-view">Voir</button></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Drawer création contrat -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<aside class="rh-drawer" id="drawer-ctr" role="dialog" aria-modal="true" aria-labelledby="dctr-title">
+  <div class="rh-drawer-head">
+    <div><h3 id="dctr-title">Créer un contrat</h3><p>La période d'essai et le profil de paie pilotent les calculs.</p></div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="rh-drawer-body">
+    <div class="em-field"><label class="em-field-label">Salarié</label><select class="em-select"><option>Sékou Edah — PERS-00903</option><option>Rechercher un salarié…</option></select></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+      <div class="em-field"><label class="em-field-label">Type de contrat</label><select class="em-select" id="ctr-type"><option>CDI</option><option selected>CDD</option><option>Temps partiel</option><option>Apprentissage</option><option>Étranger</option></select></div>
+      <div class="em-field"><label class="em-field-label">Durée d'essai (mois)</label><input class="em-input" type="number" value="3" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+      <div class="em-field"><label class="em-field-label">Date de début</label><input class="em-input" type="date" value="2026-07-01" /></div>
+      <div class="em-field"><label class="em-field-label">Date de fin <span style="font-weight:400;color:var(--text-tertiary)">(CDD)</span></label><input class="em-input" type="date" value="2027-06-30" /></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+      <div class="em-field"><label class="em-field-label">Profil de paie</label><select class="em-select"><option>Enseignant-chercheur</option><option>Administratif</option><option>Technique</option><option>Vacataire</option></select></div>
+      <div class="em-field"><label class="em-field-label">Salaire de base (FCFA)</label><input class="em-input" value="265 000" /></div>
+    </div>
+    <div class="em-alert em-alert--info"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">CDD : la date de fin est obligatoire. La fin d'essai est calculée automatiquement (1<sup>er</sup> oct. 2026).</span></div></div>
+  </div>
+  <div class="rh-drawer-foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Enregistrer en brouillon</button>
+    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Contrat créé', true);">Créer le contrat</button>
+  </div>
+</aside>
+
+<!-- Drawer vue contrat -->
+<aside class="rh-drawer" id="drawer-view" role="dialog" aria-modal="true" aria-labelledby="dv-title">
+  <div class="rh-drawer-head">
+    <div><h3 id="dv-title">Contrat — Gisèle Fanou</h3><p>CDD · <span class="mono-sm">CTRX-2024-01102</span></p></div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="rh-drawer-body">
+    <div class="em-alert em-alert--warning" style="margin:0"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><span class="em-alert-text"><b>Échéance le 31 août 2026</b> — dans 76 jours. À renouveler ou clôturer.</span></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5) var(--space-6)">
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Type</div><div style="font-size:var(--text-sm);font-weight:500;margin-top:3px">CDD — durée déterminée</div></div>
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Statut</div><div style="margin-top:3px"><span class="em-badge em-badge--warning em-badge--sm"><span class="em-badge-dot"></span>Échéance</span></div></div>
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Début</div><div style="font-size:var(--text-sm);font-weight:500;margin-top:3px">1<sup>er</sup> septembre 2024</div></div>
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Fin</div><div style="font-size:var(--text-sm);font-weight:500;margin-top:3px">31 août 2026</div></div>
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Profil de paie</div><div style="font-size:var(--text-sm);font-weight:500;margin-top:3px">Administratif</div></div>
+      <div><div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);font-weight:600">Salaire de base</div><div style="font-size:var(--text-sm);font-weight:500;margin-top:3px" class="num">295 000 F</div></div>
+    </div>
+  </div>
+  <div class="rh-drawer-foot" data-roles="gest_rh admin">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Fermer</button>
+    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Renouvellement initié', true);"><svg class="ico-sm"><use href="#i-refresh"/></svg>Renouveler</button>
+  </div>
+</aside>
+
+</Layout>

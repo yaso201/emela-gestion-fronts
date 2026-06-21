@@ -1,0 +1,16 @@
+---
+// Badge de statut (.em-badge) avec pastille. Le libellé est le contenu (slot).
+// ex. <StatusBadge variant="success">Disponible</StatusBadge>
+interface Props {
+  /** variante du DS : neutral · success · warning · error · info · accent */
+  variant?: string;
+  /** afficher la pastille colorée */
+  dot?: boolean;
+  /** taille compacte */
+  sm?: boolean;
+}
+const { variant = 'neutral', dot = true, sm = false } = Astro.props;
+---
+<span class:list={["em-badge", `em-badge--${variant}`, { "em-badge--sm": sm }]}>
+  {dot && <span class="em-badge-dot"></span>}<slot />
+</span>

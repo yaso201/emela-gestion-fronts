@@ -1,0 +1,107 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getKpis, getPayrollRuns, PAYROLL_STATUS, periodLabel } from '@emela/shared/rh-data';
+
+const kpis = await getKpis();
+const runs = await getPayrollRuns();
+const headcount = kpis.find((k) => k.id === 'headcount')?.value ?? '—';
+const current = runs.find((r) => r.status !== 'Preparation') ?? runs[0];
+const curStatus = PAYROLL_STATUS[current.status];
+const curLabel = periodLabel(current.periodMonth, current.periodYear);
+---
+<Layout title="Tableau de bord RH — emela" page="cockpit">
+<style is:global>
+  .ms-bar { display:flex; flex-direction:column; gap:var(--space-4); }
+  .ms-row { display:flex; align-items:center; gap:var(--space-4); }
+  .ms-row .lbl { font-size:var(--text-sm); width:170px; flex-shrink:0; color:var(--text-secondary); }
+  .ms-row .track { flex:1; height:10px; border-radius:999px; background:var(--sand-100); overflow:hidden; }
+  .ms-row .track i { display:block; height:100%; border-radius:999px; }
+  .ms-row .val { width:64px; text-align:right; font-family:var(--font-mono); font-size:var(--text-sm); font-weight:600; font-variant-numeric:tabular-nums; }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div>
+      <h1 id="ck-title">Tableau de bord RH</h1>
+      <p class="sub" id="ck-sub">Vue d'ensemble — effectifs, masse salariale et cycle en cours.</p>
+    </div>
+    <div class="rh-pagehead-actions">
+      <span class="em-badge em-badge--neutral em-badge--lg"><svg class="ico-sm"><use href="#i-cal"/></svg>Période — mai 2026</span>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <section class="rh-grid-4" style="margin-bottom:var(--space-8)">
+    <div class="em-kpi"><span class="em-kpi-label">Effectif actif</span><span class="em-kpi-value num">{headcount}</span><span class="em-kpi-meta">agents · +6 ce mois</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Masse salariale (mai)</span><span class="em-kpi-value num">218,4<span class="em-kpi-value-unit">M F</span></span><span class="em-kpi-trend em-kpi-trend--up"><svg class="ico-sm"><use href="#i-trendup"/></svg>+2,1 % vs avril</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Congés à valider</span><span class="em-kpi-value num">7</span><span class="em-kpi-meta">dont 2 &gt; 5 jours</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Cycle de paie</span><span class="em-kpi-value" style="font-size:20px;line-height:1.3">{curLabel}</span><span class="em-kpi-meta"><span class:list={["em-badge", `em-badge--${curStatus.variant}`, "em-badge--sm"]}><span class="em-badge-dot"></span>{curStatus.label}</span></span></div>
+  </section>
+
+  <!-- Vue Manager : Mon équipe -->
+  <section data-roles="manager" style="margin-bottom:var(--space-8)">
+    <div class="rh-grid-2">
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-users"/></svg>Mon équipe — Département Informatique</span><span class="em-table-meta">8 collaborateurs</span></div>
+        <div>
+          <div class="rh-row"><span class="rh-row-av">MA</span><div class="rh-row-main"><div class="rh-row-tt">Mahougnon Akplogan</div><div class="rh-row-meta">Maître-assistant · CDI</div></div><span class="rh-row-side"><span class="em-badge em-badge--success em-badge--sm"><span class="em-badge-dot"></span>Présent</span></span></div>
+          <div class="rh-row"><span class="rh-row-av">GF</span><div class="rh-row-main"><div class="rh-row-tt">Gisèle Fanou</div><div class="rh-row-meta">Assistante · CDD</div></div><span class="rh-row-side"><span class="em-badge em-badge--accent em-badge--sm"><span class="em-badge-dot"></span>En congé</span></span></div>
+          <div class="rh-row"><span class="rh-row-av">PT</span><div class="rh-row-main"><div class="rh-row-tt">Pascal Tchégnon</div><div class="rh-row-meta">Technicien labo · CDI</div></div><span class="rh-row-side"><span class="em-badge em-badge--success em-badge--sm"><span class="em-badge-dot"></span>Présent</span></span></div>
+          <div class="rh-row"><span class="rh-row-av">NK</span><div class="rh-row-main"><div class="rh-row-tt">Nadège Kpodo</div><div class="rh-row-meta">Maître-assistant · CDI</div></div><span class="rh-row-side"><span class="em-badge em-badge--neutral em-badge--sm"><span class="em-badge-dot"></span>Mission</span></span></div>
+        </div>
+      </div>
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-shieldcheck"/></svg>À valider</span><a class="rh-card-link" href="/validation">Ouvrir<svg class="ico-sm"><use href="#i-caret"/></svg></a></div>
+        <div>
+          <a class="rh-row" href="/validation"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-cal"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Congé annuel — G. Fanou</div><div class="rh-row-meta">10 j · 20 → 31 juil.</div></div><svg class="ico-sm" style="color:var(--sand-400)"><use href="#i-caret"/></svg></a>
+          <a class="rh-row" href="/validation"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-clock"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Permission — M. Akplogan</div><div class="rh-row-meta">1 j · 3 juil.</div></div><svg class="ico-sm" style="color:var(--sand-400)"><use href="#i-caret"/></svg></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vue RH/Direction : pilotage -->
+  <section data-roles="gest_rh dir admin">
+    <div class="rh-grid-2">
+      <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+        <div class="rh-card">
+          <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-users"/></svg>Effectif par catégorie</span><span class="em-table-meta">342 agents</span></div>
+          <div style="padding:var(--space-6)">
+            <div class="ms-bar">
+              <div class="ms-row"><span class="lbl">Enseignants-chercheurs</span><span class="track"><i style="width:49%;background:var(--ink-700)"></i></span><span class="val">168</span></div>
+              <div class="ms-row"><span class="lbl">Personnel administratif</span><span class="track"><i style="width:28%;background:var(--rh-manager)"></i></span><span class="val">96</span></div>
+              <div class="ms-row"><span class="lbl">Personnel technique</span><span class="track"><i style="width:16%;background:var(--rh-finance)"></i></span><span class="val">54</span></div>
+              <div class="ms-row"><span class="lbl">Vacataires</span><span class="track"><i style="width:7%;background:var(--accent-500)"></i></span><span class="val">24</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="rh-card">
+          <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-megaphone"/></svg>Échéances déclaratives</span><a class="rh-card-link" href="/declarations">Déclarations<svg class="ico-sm"><use href="#i-caret"/></svg></a></div>
+          <div>
+            <div class="rh-row"><span class="rh-row-av" style="background:var(--warning-50);color:var(--warning-700)"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Déclaration CNSS — mai 2026</div><div class="rh-row-meta">Échéance 15 juin · dans 1 jour</div></div><span class="em-badge em-badge--warning em-badge--sm">À transmettre</span></div>
+            <div class="rh-row"><span class="rh-row-av" style="background:var(--success-50);color:var(--success-700)"><svg class="ico-sm"><use href="#i-check"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Déclaration ITS — mai 2026</div><div class="rh-row-meta">Échéance 10 juin · transmise</div></div><span class="em-badge em-badge--success em-badge--sm">Transmise</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-list"/></svg>Files RH</span></div>
+        <div>
+          <a class="rh-row" href="/validation"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-cal"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Congés à valider</div><div class="rh-row-meta">7 demandes en attente</div></div><span class="em-counter">7</span></a>
+          <a class="rh-row" href="/personnel"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-doc"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Demandes RH (acomptes, frais)</div><div class="rh-row-meta">4 à traiter</div></div><span class="em-counter">4</span></a>
+          <a class="rh-row" href="/contrats"><span class="rh-row-av" style="background:var(--warning-50);color:var(--warning-700)"><svg class="ico-sm"><use href="#i-clock"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Contrats à échéance (90 j)</div><div class="rh-row-meta">3 CDD arrivent à terme</div></div><span class="em-counter em-counter--alert">3</span></a>
+          <a class="rh-row" href="/separations"><span class="rh-row-av" style="background:var(--sand-100);color:var(--sand-700)"><svg class="ico-sm"><use href="#i-door"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Séparations en cours</div><div class="rh-row-meta">1 cas protégé à examiner</div></div><span class="em-counter">2</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<script is:inline>
+  window.onRhRole = function (role, info) {
+    var t = document.getElementById('ck-title'), s = document.getElementById('ck-sub');
+    if (role === 'manager') { t.textContent = 'Mon équipe'; s.textContent = 'Vue de proximité — votre équipe et ses demandes à valider.'; }
+    else if (role === 'dir') { t.textContent = 'Tableau de bord RH'; s.textContent = 'Pilotage — effectifs, masse salariale et conformité déclarative.'; }
+    else { t.textContent = 'Tableau de bord RH'; s.textContent = 'Vue d\u2019ensemble — files de travail, effectifs et échéances.'; }
+  };
+</script>
+
+</Layout>

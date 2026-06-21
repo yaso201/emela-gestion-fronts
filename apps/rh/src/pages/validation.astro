@@ -1,0 +1,139 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getPayrollRuns, getValidations, periodLabel, fcfa } from '@emela/shared/rh-data';
+
+const runs = await getPayrollRuns();
+const run = runs.find((r) => r.status === 'Validee finance') ?? runs.find((r) => r.status !== 'Preparation') ?? runs[0];
+const label = periodLabel(run.periodMonth, run.periodYear);
+const employerCharges = run.totalEmployerCost - run.totalGross;
+---
+<Layout title="Validations — emela RH" page="validation">
+<style is:global>
+  .val-card { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; margin-bottom:var(--space-6); }
+  .val-head { padding:var(--space-6) var(--space-7); border-bottom:1px solid var(--border-subtle); display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-5); flex-wrap:wrap; }
+  .val-head h2 { font-family:var(--font-display); font-size:var(--text-lg); font-weight:700; margin:0; }
+  .val-head .meta { font-size:var(--text-sm); color:var(--text-secondary); margin-top:var(--space-2); }
+  .val-totals { display:grid; grid-template-columns:repeat(4,1fr); }
+  .val-totals > div { padding:var(--space-5) var(--space-7); border-right:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle); }
+  .val-totals > div:nth-child(4){ border-right:0; }
+  .val-totals .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.07em; color:var(--text-tertiary); font-weight:600; }
+  .val-totals .v { font-family:var(--font-display); font-size:var(--text-lg); font-weight:700; margin-top:var(--space-2); font-variant-numeric:tabular-nums; }
+  @media (max-width:760px){ .val-totals { grid-template-columns:repeat(2,1fr); } .val-totals > div:nth-child(2){ border-right:0; } }
+  .val-foot { padding:var(--space-5) var(--space-7); display:flex; gap:var(--space-3); justify-content:flex-end; flex-wrap:wrap; background:var(--sand-25); }
+  .imput { padding:var(--space-6) var(--space-7); }
+  table.imput-t { width:100%; border-collapse:collapse; }
+  table.imput-t td, table.imput-t th { padding:var(--space-3) var(--space-3); font-size:var(--text-sm); border-bottom:1px solid var(--border-subtle); text-align:right; }
+  table.imput-t th { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); font-weight:600; }
+  table.imput-t td:first-child, table.imput-t th:first-child { text-align:left; }
+  table.imput-t .acct { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  .emp-name { display:flex; align-items:center; gap:var(--space-3); }
+  .emp-av { width:34px; height:34px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1 id="v-title">Validations</h1><p class="sub" id="v-sub">Cycles de paie en attente de votre validation.</p></div>
+  </div>
+
+  <!-- MANAGER : demandes équipe -->
+  <section data-roles="manager">
+    <p class="rh-section-label">Demandes de l'équipe — 2 en attente</p>
+    <div class="val-card">
+      <div style="padding:var(--space-2) 0">
+        <div class="rh-row">
+          <span class="emp-av">GF</span>
+          <div class="rh-row-main"><div class="rh-row-tt">Gisèle Fanou — Congé annuel</div><div class="rh-row-meta">20 → 31 juillet · 10 jours ouvrés · solde après : 8 j</div></div>
+          <div class="rh-row-side"><button class="em-btn em-btn--secondary em-btn--sm" onclick="rhToast('Demande refusée')">Refuser</button><button class="em-btn em-btn--primary em-btn--sm" onclick="rhToast('Congé approuvé', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Approuver</button></div>
+        </div>
+        <div class="rh-row">
+          <span class="emp-av">MA</span>
+          <div class="rh-row-main"><div class="rh-row-tt">Mahougnon Akplogan — Permission</div><div class="rh-row-meta">3 juillet · 1 jour · événement familial</div></div>
+          <div class="rh-row-side"><button class="em-btn em-btn--secondary em-btn--sm" onclick="rhToast('Demande refusée')">Refuser</button><button class="em-btn em-btn--primary em-btn--sm" onclick="rhToast('Permission approuvée', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Approuver</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINANCE : validation cycle (1er niveau) -->
+  <section data-roles="finance admin">
+    <p class="rh-section-label">Paie à valider — niveau finance</p>
+    <div class="val-card">
+      <div class="val-head">
+        <div><h2>Cycle — {label}</h2><div class="meta">{run.slipCount} bulletins · transmis par Bertin Aïkpé le 31 mai · réf. <span class="num" style="font-size:var(--text-xs)">{run.id}</span></div></div>
+        <span class="em-badge em-badge--warning em-badge--lg"><span class="em-badge-dot"></span>Étape 3 — validation finance</span>
+      </div>
+      <div class="val-totals">
+        <div><div class="k">Masse brute</div><div class="v num">{fcfa(run.totalGross)}</div></div>
+        <div><div class="k">Total net</div><div class="v num">{fcfa(run.totalNet)}</div></div>
+        <div><div class="k">Charges patronales</div><div class="v num">{fcfa(employerCharges)}</div></div>
+        <div><div class="k">Coût employeur</div><div class="v num">{fcfa(run.totalEmployerCost)}</div></div>
+      </div>
+      <div class="imput">
+        <div class="rh-section-label" style="margin-bottom:var(--space-4)">Imputation comptable (vers University Finance)</div>
+        <table class="imput-t">
+          <thead><tr><th>Compte</th><th>Libellé</th><th>Débit</th><th>Crédit</th></tr></thead>
+          <tbody>
+            <tr><td class="acct">6411</td><td>Rémunérations du personnel</td><td class="num">187 600 000</td><td class="num">—</td></tr>
+            <tr><td class="acct">6451</td><td>Charges patronales CNSS</td><td class="num">30 800 000</td><td class="num">—</td></tr>
+            <tr><td class="acct">4211</td><td>Personnel — net à payer</td><td class="num">—</td><td class="num">150 900 000</td></tr>
+            <tr><td class="acct">4311</td><td>CNSS à reverser</td><td class="num">—</td><td class="num">52 854 000</td></tr>
+            <tr><td class="acct">4471</td><td>ITS à reverser (État)</td><td class="num">—</td><td class="num">14 646 000</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="val-foot">
+        <button class="em-btn em-btn--secondary" data-drawer-open="drawer-renvoi"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Renvoyer au responsable paie</button>
+        <button class="em-btn em-btn--primary" onclick="rhToast('Cycle validé — niveau finance', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Valider (finance)</button>
+      </div>
+    </div>
+    <div class="em-alert em-alert--neutral"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">La validation finance est l'<b>étape 2 du circuit</b>. Après votre accord, le cycle passe en validation direction. La comptabilité générale reste gérée dans University Finance.</span></div></div>
+  </section>
+
+  <!-- DIRECTION : validation finale -->
+  <section data-roles="dir">
+    <p class="rh-section-label">Paie à valider — validation finale</p>
+    <div class="val-card">
+      <div class="val-head">
+        <div><h2>Cycle — {label}</h2><div class="meta">{run.slipCount} bulletins · <span style="color:var(--success-700);font-weight:600">validé finance</span> par Carine Zinsou · réf. <span class="num" style="font-size:var(--text-xs)">{run.id}</span></div></div>
+        <span class="em-badge em-badge--info em-badge--lg"><span class="em-badge-dot"></span>Étape 4 — validation direction</span>
+      </div>
+      <div class="val-totals">
+        <div><div class="k">Masse brute</div><div class="v num">{fcfa(run.totalGross)}</div></div>
+        <div><div class="k">Total net</div><div class="v num">{fcfa(run.totalNet)}</div></div>
+        <div><div class="k">Charges patronales</div><div class="v num">{fcfa(employerCharges)}</div></div>
+        <div><div class="k">Coût employeur</div><div class="v num">{fcfa(run.totalEmployerCost)}</div></div>
+      </div>
+      <div class="val-foot">
+        <button class="em-btn em-btn--secondary" data-drawer-open="drawer-renvoi"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Renvoyer</button>
+        <button class="em-btn em-btn--primary" onclick="rhToast('Cycle validé — paie autorisée', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Valider (final) &amp; autoriser le paiement</button>
+      </div>
+    </div>
+    <div class="em-alert em-alert--neutral"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Validation finale. Après votre accord, le cycle est transmis à la comptabilité et les virements sont autorisés. Les <b>décisions sensibles</b> (fins de contrat) se finalisent depuis l'onglet <a href="/separations" style="color:var(--ink-700);font-weight:600">Séparations</a>.</span></div></div>
+  </section>
+</main>
+
+<!-- Drawer renvoi (motif obligatoire) -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<aside class="rh-drawer" id="drawer-renvoi" role="dialog" aria-modal="true" aria-labelledby="dre-title">
+  <div class="rh-drawer-head">
+    <div><h3 id="dre-title">Renvoyer le cycle</h3><p>Le cycle repart en préparation. Un motif est requis.</p></div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="rh-drawer-body">
+    <div class="em-field"><label class="em-field-label">Motif du renvoi <span class="em-required">*</span></label><textarea class="em-textarea" placeholder="Précisez les corrections attendues…"></textarea></div>
+  </div>
+  <div class="rh-drawer-foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--destructive" onclick="RhDrawer.close(); rhToast('Cycle renvoyé au responsable paie');">Renvoyer le cycle</button>
+  </div>
+</aside>
+<script is:inline>
+  window.onRhRole = function (role) {
+    var t = document.getElementById('v-title'), s = document.getElementById('v-sub');
+    if (role === 'manager') { t.textContent = 'Demandes à valider'; s.textContent = 'Congés et frais de votre équipe en attente de décision.'; }
+    else if (role === 'dir') { t.textContent = 'Validations — Direction'; s.textContent = 'Validation finale des cycles de paie et décisions sensibles.'; }
+    else { t.textContent = 'Validations — Finance'; s.textContent = 'Validation du volet financier de la paie (1er niveau).'; }
+  };
+</script>
+
+</Layout>

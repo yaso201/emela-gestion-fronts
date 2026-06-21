@@ -1,0 +1,12 @@
+---
+// Badge de statut (.em-badge) avec pastille. Libellé = contenu (slot).
+interface Props {
+  variant?: string;
+  dot?: boolean;
+  sm?: boolean;
+}
+const { variant = 'neutral', dot = true, sm = false } = Astro.props;
+---
+<span class:list={["em-badge", `em-badge--${variant}`, { "em-badge--sm": sm }]}>
+  {dot && <span class="em-badge-dot"></span>}<slot />
+</span>

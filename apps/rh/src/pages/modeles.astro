@@ -1,0 +1,189 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getDocumentTemplates } from '@emela/shared/rh-data';
+
+const templates = await getDocumentTemplates();
+const fmtDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+<Layout title="Modèles de documents — emela RH" page="modeles">
+<style is:global>
+  .ed-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:var(--space-6); align-items:start; }
+  @media (max-width:980px){ .ed-grid { grid-template-columns:1fr; } }
+  .seg2 { display:inline-flex; padding:3px; background:var(--sand-100); border-radius:var(--radius-sm); }
+  .seg2 button { padding:7px 16px; font-size:var(--text-sm); font-weight:600; color:var(--text-secondary); background:transparent; border:0; border-radius:var(--radius-xs); cursor:pointer; }
+  .seg2 button.on { background:var(--surface-paper); color:var(--ink-900); box-shadow:var(--shadow-xs); }
+  .ed-toolbar { display:flex; gap:var(--space-2); flex-wrap:wrap; padding:var(--space-3); border:1px solid var(--border-default); border-bottom:0; border-radius:var(--radius-sm) var(--radius-sm) 0 0; background:var(--sand-25); align-items:center; }
+  .tb-btn { min-width:34px; height:34px; padding:0 var(--space-3); border:1px solid var(--border-default); background:var(--surface-paper); border-radius:var(--radius-xs); cursor:pointer; font-size:var(--text-sm); font-weight:600; color:var(--text-secondary); display:inline-flex; align-items:center; gap:6px; }
+  .tb-btn:hover { border-color:var(--ink-600); color:var(--text-primary); }
+  .tb-sep { width:1px; align-self:stretch; background:var(--border-default); margin:0 2px; }
+  .ed-field-menu { position:relative; }
+  .ed-menu { position:absolute; top:calc(100% + 4px); left:0; background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-sm); box-shadow:var(--shadow-lg); padding:var(--space-2); z-index:10; min-width:200px; display:none; }
+  .ed-menu.open { display:block; }
+  .ed-menu button { display:block; width:100%; text-align:left; padding:7px var(--space-4); border:0; background:transparent; border-radius:var(--radius-xs); font-size:var(--text-sm); cursor:pointer; color:var(--text-primary); font-family:var(--font-mono); }
+  .ed-menu button:hover { background:var(--surface-hover); }
+  .ed-body { min-height:340px; border:1px solid var(--border-default); border-radius:0 0 var(--radius-sm) var(--radius-sm); padding:var(--space-6); font-size:var(--text-base); line-height:1.7; color:var(--text-primary); overflow-y:auto; outline:none; }
+  .ed-body:focus { border-color:var(--border-focus); box-shadow:var(--shadow-focus); }
+  .ph { background:var(--accent-100); color:var(--accent-900); padding:1px 6px; border-radius:var(--radius-xs); font-family:var(--font-mono); font-size:.85em; font-weight:600; white-space:nowrap; }
+  .preview { border:1px solid var(--border-default); border-radius:var(--radius-sm); padding:var(--space-8); font-size:var(--text-base); line-height:1.7; min-height:340px; background:var(--surface-paper); }
+  .preview h2 { font-family:var(--font-display); }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  @media (max-width:900px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Modèles de documents</h1><p class="sub">Composez vos documents-types avec des champs fusionnés depuis le dossier salarié.</p></div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--secondary" id="btn-new"><svg class="ico-sm"><use href="#i-plus"/></svg>Nouveau modèle</button>
+    </div>
+  </div>
+
+  <!-- Liste -->
+  <p class="rh-section-label">Mes modèles</p>
+  <div class="em-table-wrap" style="margin-bottom:var(--space-9)">
+    <table class="em-table">
+      <thead><tr><th>Modèle</th><th class="hide-md">Catégorie</th><th>Champs</th><th class="hide-md">Modifié le</th><th style="text-align:right">Actions</th></tr></thead>
+      <tbody>
+        {templates.map((t, i) => (
+          <tr>
+            <td><b>{t.title}</b></td>
+            <td class="hide-md">{t.category}</td>
+            <td><span class="em-badge em-badge--info em-badge--sm">{t.variables} champs</span></td>
+            <td class="hide-md">{fmtDate(t.updatedOn)}</td>
+            <td style="text-align:right;white-space:nowrap"><button class="em-btn em-btn--ghost em-btn--sm" id={i === 0 ? 'btn-edit' : undefined} onclick={i === 0 ? undefined : "rhToast('Édition…')"}>Éditer</button> <button class="em-btn em-btn--secondary em-btn--sm" onclick="rhToast('Document généré', true)">Générer</button></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Éditeur -->
+  <p class="rh-section-label" id="ed-anchor">Éditeur de modèle</p>
+  <div class="ed-grid">
+    <div class="rh-card" style="padding:var(--space-7)">
+      <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+        <div class="em-field"><label class="em-field-label" for="m-name">Nom du modèle</label><input class="em-input" id="m-name" value="Attestation de travail" /></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+          <div class="em-field"><label class="em-field-label">Type de modèle</label>
+            <div class="seg2" id="m-type"><button class="on" data-t="perm">Permanent</button><button data-t="temp">Temporaire</button></div>
+          </div>
+          <div class="em-field" id="m-exp-wrap" hidden><label class="em-field-label" for="m-exp">Date d'expiration</label><input class="em-input" id="m-exp" type="date" value="2026-10-31" /></div>
+          <div class="em-field"><label class="em-field-label" for="m-cat">Catégorie</label><select class="em-select" id="m-cat"><option>RH</option><option>Paie</option><option>Direction</option></select></div>
+        </div>
+
+        <div>
+          <label class="em-field-label" style="margin-bottom:var(--space-3)">Contenu du document</label>
+          <div class="ed-toolbar">
+            <button class="tb-btn" type="button" data-cmd="bold" title="Gras" style="font-weight:800">B</button>
+            <button class="tb-btn" type="button" data-cmd="italic" title="Italique" style="font-style:italic">I</button>
+            <button class="tb-btn" type="button" data-cmd="formatBlock" data-val="h2" title="Titre">Titre</button>
+            <button class="tb-btn" type="button" data-cmd="insertUnorderedList" title="Liste">Liste</button>
+            <span class="tb-sep"></span>
+            <div class="ed-field-menu">
+              <button class="tb-btn" type="button" id="field-toggle"><svg class="ico-sm"><use href="#i-plus"/></svg>Insérer un champ<svg class="ico-sm"><use href="#i-caretdown"/></svg></button>
+              <div class="ed-menu" id="field-menu"></div>
+            </div>
+          </div>
+          <div class="ed-body" id="m-body" contenteditable="true"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--space-3);justify-content:flex-end;margin-top:var(--space-6);flex-wrap:wrap">
+        <button class="em-btn em-btn--secondary" onclick="rhToast('Brouillon enregistré', true)">Enregistrer</button>
+        <button class="em-btn em-btn--primary" onclick="rhToast('Modèle publié', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Publier le modèle</button>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4)">
+        <span class="rh-section-label" style="margin:0">Aperçu</span>
+        <div class="seg2" id="pv-mode"><button class="on" data-m="tpl">Champs</button><button data-m="data">Avec données</button></div>
+      </div>
+      <div class="preview" id="m-preview"></div>
+      <p class="mono-sm" style="margin-top:var(--space-4)">Données d'exemple : Mahougnon Akplogan · PERS-00742 · Maître-assistant.</p>
+    </div>
+  </div>
+</main>
+<script is:inline>
+(function () {
+  var FIELDS = [
+    { k: 'nom_complet', label: 'Nom complet', v: 'Mahougnon Akplogan' },
+    { k: 'matricule', label: 'Matricule', v: 'PERS-00742' },
+    { k: 'poste', label: 'Poste', v: 'Maître-assistant' },
+    { k: 'departement', label: 'Département', v: 'Informatique' },
+    { k: 'type_contrat', label: 'Type de contrat', v: 'CDI' },
+    { k: 'date_embauche', label: "Date d'embauche", v: '1ᵉʳ octobre 2019' },
+    { k: 'salaire_base', label: 'Salaire de base', v: '485 000 FCFA' },
+    { k: 'date_du_jour', label: 'Date du jour', v: '16 juin 2026' }
+  ];
+  var VMAP = {}; FIELDS.forEach(function (f) { VMAP[f.k] = f.v; });
+
+  var body = document.getElementById('m-body');
+  body.innerHTML =
+    '<h2>Attestation de travail</h2>' +
+    '<p>Je soussigné, Directeur des Ressources Humaines de l\u2019Université LaNEM, atteste que ' +
+    '<span class="ph" contenteditable="false">{{nom_complet}}</span>, matricule <span class="ph" contenteditable="false">{{matricule}}</span>, ' +
+    'est employé(e) au sein de notre établissement en qualité de <span class="ph" contenteditable="false">{{poste}}</span> ' +
+    '(département <span class="ph" contenteditable="false">{{departement}}</span>) depuis le <span class="ph" contenteditable="false">{{date_embauche}}</span> ' +
+    'dans le cadre d\u2019un contrat <span class="ph" contenteditable="false">{{type_contrat}}</span>.</p>' +
+    '<p>La présente attestation est délivrée pour servir et valoir ce que de droit.</p>' +
+    '<p>Fait à Abomey-Calavi, le <span class="ph" contenteditable="false">{{date_du_jour}}</span>.</p>';
+
+  // Menu champs
+  var menu = document.getElementById('field-menu');
+  menu.innerHTML = FIELDS.map(function (f) { return '<button type="button" data-k="' + f.k + '">' + f.label + ' · {{' + f.k + '}}</button>'; }).join('');
+  var lastRange = null;
+  body.addEventListener('keyup', saveSel); body.addEventListener('mouseup', saveSel);
+  function saveSel() { var s = window.getSelection(); if (s.rangeCount && body.contains(s.anchorNode)) lastRange = s.getRangeAt(0); }
+  document.getElementById('field-toggle').addEventListener('click', function (e) { e.stopPropagation(); menu.classList.toggle('open'); });
+  document.addEventListener('click', function () { menu.classList.remove('open'); });
+  menu.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var k = b.getAttribute('data-k');
+    var chip = document.createElement('span'); chip.className = 'ph'; chip.setAttribute('contenteditable', 'false'); chip.textContent = '{{' + k + '}}';
+    body.focus();
+    var sel = window.getSelection();
+    if (lastRange) { sel.removeAllRanges(); sel.addRange(lastRange); }
+    var r = sel.rangeCount ? sel.getRangeAt(0) : null;
+    if (r) { r.deleteContents(); r.insertNode(chip); r.setStartAfter(chip); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+    else { body.appendChild(chip); }
+    renderPreview();
+  });
+
+  // Toolbar formatage
+  document.querySelectorAll('.tb-btn[data-cmd]').forEach(function (btn) {
+    btn.addEventListener('click', function () { body.focus(); document.execCommand(btn.getAttribute('data-cmd'), false, btn.getAttribute('data-val') || null); renderPreview(); });
+  });
+  body.addEventListener('input', renderPreview);
+
+  // Type permanent / temporaire
+  document.getElementById('m-type').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    document.getElementById('m-exp-wrap').hidden = b.getAttribute('data-t') !== 'temp';
+  });
+
+  // Aperçu
+  var pvMode = 'tpl';
+  document.getElementById('pv-mode').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+    pvMode = b.getAttribute('data-m'); renderPreview();
+  });
+  function renderPreview() {
+    var html = body.innerHTML;
+    if (pvMode === 'data') {
+      html = html.replace(/<span class="ph"[^>]*>\{\{(\w+)\}\}<\/span>/g, function (m, k) { return '<b>' + (VMAP[k] || ('{{' + k + '}}')) + '</b>'; });
+    }
+    document.getElementById('m-preview').innerHTML = html;
+  }
+
+  // Boutons nouveau / éditer → focus éditeur
+  function focusEditor(){ document.getElementById('ed-anchor').scrollIntoView({ behavior:'smooth', block:'start' }); }
+  document.getElementById('btn-new').addEventListener('click', function () { document.getElementById('m-name').value=''; body.innerHTML='<h2>Nouveau document</h2><p>Saisissez votre texte et insérez des champs…</p>'; renderPreview(); focusEditor(); });
+  var be = document.getElementById('btn-edit'); if (be) be.addEventListener('click', focusEditor);
+
+  renderPreview();
+})();
+</script>
+
+</Layout>

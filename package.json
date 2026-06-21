@@ -1,0 +1,19 @@
+{
+  "name": "emela-sirh",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm --filter @emela/self-service dev",
+    "dev:self-service": "pnpm --filter @emela/self-service dev",
+    "dev:rh": "pnpm --filter @emela/rh dev",
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "format": "prettier --write \"**/*.{astro,ts,js,css,md,json}\"",
+    "format:check": "prettier --check \"**/*.{astro,ts,js,css,md,json}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "prettier-plugin-astro": "^0.14.1"
+  }
+}

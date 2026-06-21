@@ -1,0 +1,13 @@
+---
+// Icône du châssis — pointe vers un <symbol> du Sprite central (rendu une fois par le Layout).
+interface Props {
+  /** id du symbole, ex. "i-bell" */
+  name: string;
+  /** classe de taille : ico (18) · ico-sm (15) · ico-lg (22) */
+  cls?: string;
+  /** style inline optionnel (ex. couleur) */
+  style?: string;
+}
+const { name, cls = 'ico', style } = Astro.props;
+---
+<svg class={cls} style={style}><use href={`#${name}`}></use></svg>

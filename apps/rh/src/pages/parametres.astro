@@ -1,0 +1,139 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getPayrollParameters } from '@emela/shared/rh-data';
+
+const params = await getPayrollParameters();
+const cnss = params.filter((p) => p.group === 'CNSS');
+const convention = params.find((p) => p.key === 'PAYROLL.CONVENTION_COLLECTIVE');
+const fmtVal = (p: typeof params[number]) => p.unit === '%' ? `${p.value} %` : (p.unit ? `${p.value} ${p.unit}` : p.value);
+---
+<Layout title="Paramètres de paie — emela RH" page="parametres">
+<style is:global>
+  .tabpane { display:none; }
+  .tabpane.is-active { display:block; }
+  .param-row { display:flex; align-items:center; gap:var(--space-5); padding:var(--space-5) var(--space-6); border-top:1px solid var(--border-subtle); }
+  .param-row:first-child { border-top:0; }
+  .param-row .lbl { flex:1; min-width:0; }
+  .param-row .lbl .t { font-size:var(--text-sm); font-weight:600; }
+  .param-row .lbl .d { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+  .param-row .val { font-family:var(--font-mono); font-size:var(--text-sm); font-weight:600; font-variant-numeric:tabular-nums; }
+  .param-row .em-input { width:120px; text-align:right; }
+  .access-gate { padding:var(--space-12) var(--space-7); }
+</style>
+
+<main class="rh-page">
+  <!-- Gate non-admin -->
+  <div data-roles="manager gest_rh paie finance dir">
+    <div class="rh-card access-gate" style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--space-4)">
+      <span class="rh-row-av" style="width:56px;height:56px;background:var(--sand-100);color:var(--text-tertiary)"><svg class="ico-lg"><use href="#i-lock"/></svg></span>
+      <div style="font-size:var(--text-md);font-weight:600">Accès réservé à l'administration technique</div>
+      <p style="font-size:var(--text-sm);color:var(--text-secondary);max-width:420px;margin:0">Les paramètres de paie, référentiels et opérations de migration ne sont accessibles qu'au rôle <b>Admin technique</b>.</p>
+    </div>
+  </div>
+
+  <!-- Contenu admin -->
+  <div data-roles="admin">
+    <div class="rh-pagehead">
+      <div><h1>Paramètres &amp; exploitation</h1><p class="sub">Taux, barèmes, référentiels et migration. Toute modification est <b>versionnée</b>.</p></div>
+      <div class="rh-pagehead-actions"><span class="em-badge em-badge--neutral em-badge--lg"><svg class="ico-sm"><use href="#i-clock"/></svg>Version en vigueur — 01/01/2026</span></div>
+    </div>
+
+    <div class="em-tabs" id="ptabs" style="margin-bottom:var(--space-7)">
+      <button class="em-tab is-active" data-tab="paie">Paramètres de paie</button>
+      <button class="em-tab" data-tab="ref">Référentiels</button>
+      <button class="em-tab" data-tab="mig">Migration / reprise</button>
+    </div>
+
+    <!-- PAIE -->
+    <div class="tabpane is-active" data-pane="paie">
+      <div class="rh-grid-2">
+        <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+          <div class="rh-card">
+            <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-shieldcheck"/></svg>Taux CNSS</span><button class="em-btn em-btn--ghost em-btn--sm" onclick="rhToast('Édition versionnée…')"><svg class="ico-sm"><use href="#i-pencil"/></svg>Modifier</button></div>
+            <div>
+              {cnss.map((p) => (
+                <div class="param-row"><div class="lbl"><div class="t">{p.label}</div></div><span class="val">{fmtVal(p)}</span></div>
+              ))}
+              <div class="param-row"><div class="lbl"><div class="t">Plafond mensuel — branche pension</div></div><span class="val">1 000 000 F</span></div>
+            </div>
+          </div>
+          <div class="rh-card">
+            <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-coins"/></svg>Autres paramètres</span></div>
+            <div>
+              <div class="param-row"><div class="lbl"><div class="t">SMIG mensuel</div><div class="d">Salaire minimum interprofessionnel garanti</div></div><span class="val">52 000 F</span></div>
+              <div class="param-row"><div class="lbl"><div class="t">Redevance ORTB</div><div class="d">Forfait mensuel</div></div><span class="val">1 000 F</span></div>
+              <div class="param-row"><div class="lbl"><div class="t">Convention collective</div></div><span class="val" style="font-family:var(--font-sans)">{convention?.value ?? 'Enseignement sup.'}</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="rh-card">
+          <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-megaphone"/></svg>Barème ITS — tranches mensuelles</span></div>
+          <div class="em-table-wrap" style="border:0;border-radius:0">
+            <table class="em-table em-table--dense">
+              <thead><tr><th>Tranche (FCFA)</th><th class="em-cell-num">Taux</th></tr></thead>
+              <tbody>
+                <tr><td>0 — 60 000</td><td class="em-cell-num num">0 %</td></tr>
+                <tr><td>60 001 — 150 000</td><td class="em-cell-num num">10 %</td></tr>
+                <tr><td>150 001 — 250 000</td><td class="em-cell-num num">15 %</td></tr>
+                <tr><td>250 001 — 500 000</td><td class="em-cell-num num">19 %</td></tr>
+                <tr><td>au-delà de 500 000</td><td class="em-cell-num num">30 %</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:var(--space-5) var(--space-6);border-top:1px solid var(--border-subtle)">
+            <div class="em-alert em-alert--info" style="margin:0"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Les taux et tranches alimentent le moteur de paie. Une modification crée une nouvelle version applicable au prochain cycle.</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REFERENTIELS -->
+    <div class="tabpane" data-pane="ref">
+      <div class="rh-grid-2">
+        <div class="rh-card">
+          <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-cal"/></svg>Jours fériés 2026</span><button class="em-btn em-btn--ghost em-btn--sm"><svg class="ico-sm"><use href="#i-plus"/></svg>Ajouter</button></div>
+          <div>
+            <div class="param-row"><div class="lbl"><div class="t">Fête du Travail</div></div><span class="val" style="font-family:var(--font-sans)">1 mai</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Fête de l'Indépendance</div></div><span class="val" style="font-family:var(--font-sans)">1 août</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Fête nationale du Vodoun</div></div><span class="val" style="font-family:var(--font-sans)">10 janvier</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Toussaint</div></div><span class="val" style="font-family:var(--font-sans)">1 novembre</span></div>
+          </div>
+        </div>
+        <div class="rh-card">
+          <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-list"/></svg>Types de congés &amp; catégories</span></div>
+          <div>
+            <div class="param-row"><div class="lbl"><div class="t">Congé annuel</div><div class="d">2,5 j ouvrables / mois</div></div><span class="em-badge em-badge--info em-badge--sm">30 j/an</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Congé maladie</div><div class="d">justificatif requis</div></div><span class="em-badge em-badge--info em-badge--sm">7 j/an</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Permission exceptionnelle</div></div><span class="em-badge em-badge--info em-badge--sm">10 j/an</span></div>
+            <div class="param-row"><div class="lbl"><div class="t">Catégories salariales</div><div class="d">Cadre · Agent de maîtrise · Employé · Ouvrier</div></div><span class="em-badge em-badge--neutral em-badge--sm">4</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MIGRATION -->
+    <div class="tabpane" data-pane="mig">
+      <div class="rh-card" style="max-width:760px">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-refresh"/></svg>Migration / reprise de données (Lot 3)</span></div>
+        <div style="padding:var(--space-7)">
+          <div class="em-alert em-alert--warning" style="margin-bottom:var(--space-6)"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><div class="em-alert-title">Opération sensible</div><span class="em-alert-text">Toujours exécuter un <b>test à blanc</b> avant la migration réelle. Les exécutions sont idempotentes et journalisées.</span></div></div>
+          <div class="param-row" style="border:0;padding-left:0;padding-right:0"><div class="lbl"><div class="t">Dernier test à blanc</div><div class="d">14 juin 2026 · 0 rejet sur 342 lignes</div></div><span class="em-badge em-badge--success"><span class="em-badge-dot"></span>Concluant</span></div>
+          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6);flex-wrap:wrap">
+            <button class="em-btn em-btn--secondary" onclick="rhToast('Test à blanc lancé…')"><svg class="ico-sm"><use href="#i-play"/></svg>Lancer un test à blanc</button>
+            <button class="em-btn em-btn--primary" onclick="rhToast('Migration lancée (idempotente)', true)"><svg class="ico-sm"><use href="#i-refresh"/></svg>Lancer la migration</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+<script is:inline>
+  document.getElementById('ptabs').addEventListener('click', function (e) {
+    var b = e.target.closest('.em-tab'); if (!b) return;
+    document.querySelectorAll('#ptabs .em-tab').forEach(function (t) { t.classList.toggle('is-active', t === b); });
+    var pane = b.getAttribute('data-tab');
+    document.querySelectorAll('.tabpane').forEach(function (p) { p.classList.toggle('is-active', p.getAttribute('data-pane') === pane); });
+  });
+</script>
+
+</Layout>

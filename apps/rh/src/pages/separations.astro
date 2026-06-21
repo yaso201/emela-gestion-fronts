@@ -1,0 +1,108 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getSeparations, SEPARATION_KIND, separationBadge, separationSteps } from '@emela/shared/rh-data';
+
+const separations = await getSeparations();
+const enCours = separations.filter((s) => s.stage !== 'cloturee').length;
+const protege = separations.filter((s) => s.protected && s.stage === 'autorisation').length;
+const aFinaliser = separations.filter((s) => s.stage === 'finalisation').length;
+const initials = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+---
+<Layout title="Séparations — emela RH" page="separations">
+<style is:global>
+  .sep-card { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:var(--space-6) var(--space-7); margin-bottom:var(--space-5); }
+  .sep-card.protected { border-color:var(--error-100); background:var(--error-50); }
+  .sep-top { display:flex; align-items:center; gap:var(--space-5); flex-wrap:wrap; }
+  .emp-av { width:42px; height:42px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; }
+  .sep-id { flex:1; min-width:200px; }
+  .sep-id .nm { font-size:var(--text-base); font-weight:700; }
+  .sep-id .mt { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:2px; }
+  .sep-steps { display:flex; gap:var(--space-2); margin-top:var(--space-6); flex-wrap:wrap; }
+  .sep-step { display:flex; align-items:center; gap:var(--space-2); padding:4px 12px; border-radius:var(--radius-full); font-size:var(--text-xs); font-weight:600; background:var(--sand-100); color:var(--sand-600); }
+  .sep-step.done { background:var(--success-50); color:var(--success-700); }
+  .sep-step.cur { background:var(--ink-800); color:#fff; }
+  .sep-step .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Séparations</h1><p class="sub">Fins de contrat — initiation, documents de sortie et finalisation.</p></div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--primary" data-roles="gest_rh admin" data-drawer-open="drawer-sep"><svg class="ico-sm"><use href="#i-plus"/></svg>Initier une séparation</button>
+    </div>
+  </div>
+
+  <section class="rh-grid-3" style="margin-bottom:var(--space-7)">
+    <div class="em-kpi"><span class="em-kpi-label">Séparations en cours</span><span class="em-kpi-value num">{enCours}</span><span class="em-kpi-meta">démission · fin de CDD</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Cas protégés</span><span class="em-kpi-value num" style="color:var(--error-700)">{protege}</span><span class="em-kpi-meta">contrôle bloquant</span></div>
+    <div class="em-kpi"><span class="em-kpi-label">À finaliser (direction)</span><span class="em-kpi-value num">{aFinaliser}</span><span class="em-kpi-meta">solde de tout compte prêt</span></div>
+  </section>
+
+  <p class="rh-section-label">Dossiers en cours</p>
+
+  {separations.map((s) => {
+    const badge = separationBadge(s);
+    const steps = separationSteps(s);
+    const fmtDate = new Date(s.effectiveDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    return (
+      <div class:list={["sep-card", { protected: s.protected && s.stage === 'autorisation' }]}>
+        <div class="sep-top">
+          <span class="emp-av" style={s.protected && s.stage === 'autorisation' ? 'background:var(--error-100);color:var(--error-700)' : ''}>{initials(s.employeeName)}</span>
+          <div class="sep-id">
+            <div class="nm">{s.employeeName}</div>
+            <div class="mt">{s.designation} · {s.matricule} · {SEPARATION_KIND[s.kind]} ({fmtDate})</div>
+          </div>
+          {s.protected && s.stage === 'autorisation'
+            ? <span class="em-badge em-badge--error em-badge--lg"><svg class="ico-sm"><use href="#i-lock"/></svg>{badge.label}</span>
+            : <span class:list={["em-badge", `em-badge--${badge.variant}`, "em-badge--lg"]}><span class="em-badge-dot"></span>{badge.label}</span>}
+        </div>
+
+        {s.protected && s.stage === 'autorisation' && (
+          <div class="em-alert em-alert--error" style="margin-top:var(--space-6)">
+            <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span>
+            <div class="em-alert-body"><div class="em-alert-title">{s.protectionReason}</div><span class="em-alert-text">La séparation ne peut être finalisée sans autorisation préalable de l'inspection du travail (D10 §21). Le contrôle serveur bloque la finalisation.</span></div>
+          </div>
+        )}
+
+        <div class="sep-steps">
+          {steps.map((st) => (
+            <span class:list={["sep-step", { done: st.done, cur: st.cur }]}><span class="d"></span>{st.label}</span>
+          ))}
+        </div>
+
+        {s.stage === 'documents' && (
+          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6);flex-wrap:wrap">
+            <button class="em-btn em-btn--secondary" onclick="rhToast('Génération du certificat &amp; du solde de tout compte…')"><svg class="ico-sm"><use href="#i-download"/></svg>Documents de sortie</button>
+          </div>
+        )}
+        {s.stage === 'finalisation' && (
+          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-6);flex-wrap:wrap">
+            <button class="em-btn em-btn--primary" data-roles="dir admin" onclick="rhToast('Séparation finalisée', true)"><svg class="ico-sm"><use href="#i-check"/></svg>Finaliser la séparation</button>
+            <span class="em-badge em-badge--neutral" data-roles="gest_rh" style="align-self:center"><svg class="ico-sm"><use href="#i-info"/></svg>Finalisation réservée à la direction</span>
+          </div>
+        )}
+      </div>
+    );
+  })}
+</main>
+
+<!-- Drawer initiation -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<aside class="rh-drawer" id="drawer-sep" role="dialog" aria-modal="true" aria-labelledby="ds-title">
+  <div class="rh-drawer-head">
+    <div><h3 id="ds-title">Initier une séparation</h3><p>Le type de motif conditionne le préavis et les documents.</p></div>
+    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="rh-drawer-body">
+    <div class="em-field"><label class="em-field-label">Salarié</label><select class="em-select"><option>Rechercher un salarié…</option></select></div>
+    <div class="em-field"><label class="em-field-label">Motif de séparation</label><select class="em-select"><option>Démission</option><option>Fin de CDD</option><option>Licenciement</option><option>Départ à la retraite</option><option>Rupture conventionnelle</option></select></div>
+    <div class="em-field"><label class="em-field-label">Date d'effet</label><input class="em-input" type="date" value="2026-07-31" /></div>
+    <div class="em-alert em-alert--warning"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Un contrôle de <b>cas protégé</b> est exécuté à l'initiation. Si le salarié est protégé, la finalisation sera bloquée jusqu'à autorisation.</span></div></div>
+  </div>
+  <div class="rh-drawer-foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Séparation initiée', true);">Initier</button>
+  </div>
+</aside>
+
+</Layout>

@@ -1,0 +1,167 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import Drawer from '../components/Drawer.astro';
+import { getLeaveBalances, getLeaveRequests, LEAVE_TONE, LEAVE_STATUS, pct } from '@emela/shared/data';
+
+const balances = await getLeaveBalances();
+const leaveReqs = await getLeaveRequests();
+---
+<Layout title="Mes congés — Espace personnel emela" page="conges">
+<style>
+  .leave-big { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-bottom:var(--space-9); }
+  @media (max-width:720px){ .leave-big { grid-template-columns:1fr; } }
+  .lb-card { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); padding:var(--space-6); }
+  .lb-top { display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
+  .lb-name { font-size:var(--text-sm); font-weight:600; color:var(--text-primary); }
+  .lb-val { font-family:var(--font-display); font-size:36px; font-weight:700; letter-spacing:-.02em; line-height:1; font-variant-numeric:tabular-nums; margin-top:var(--space-5); }
+  .lb-val span { font-size:var(--text-base); font-weight:500; color:var(--text-tertiary); }
+  .lb-bar { height:6px; border-radius:999px; background:var(--sand-100); margin-top:var(--space-4); overflow:hidden; }
+  .lb-bar i { display:block; height:100%; border-radius:999px; }
+  .lb-meta { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:var(--space-4); }
+</style>
+
+
+
+<main class="hr-page">
+  <PageHead title="Mes congés" sub="Soldes, demandes en cours et historique. Toute demande est transmise à votre manager pour validation.">
+    <Fragment slot="actions"><a class="em-btn em-btn--accent" data-drawer-open="drawer-conge" href="javascript:void(0)"><Icon name="i-plane" cls="ico-sm" />Demander un congé</a></Fragment>
+  </PageHead>
+
+  <!-- Soldes -->
+  <p class="hr-section-label">Soldes au 16 juin 2026</p>
+  <section class="leave-big">
+    {balances.map((b) => {
+      const tone = LEAVE_TONE[b.tone];
+      return (
+        <div class="lb-card">
+          <div class="lb-top"><span class="lb-name">{b.label}</span><span class:list={["em-badge", `em-badge--${tone.badge}`, "em-badge--sm"]}>{b.total} j/an</span></div>
+          <div class="lb-val">{b.remaining} <span>/ {b.total} j</span></div>
+          <div class="lb-bar"><i style={`width:${pct(b.remaining, b.total)}%;background:${tone.color}`}></i></div>
+          <div class="lb-meta">{b.note}</div>
+        </div>
+      );
+    })}
+  </section>
+
+  <!-- Projection des soldes -->
+  <p class="hr-section-label">Projection de mes soldes</p>
+  <Card title="Mon compteur à une date future" icon="i-trendup" style="margin-bottom: var(--space-8);">
+    <Fragment slot="actions"><label style="display:flex;align-items:center;gap:var(--space-3);font-size:var(--text-sm);color:var(--text-secondary)">Voir au
+        <select id="proj-month" class="em-select" style="max-width:190px">
+          <option data-m="1">31 juillet 2026</option>
+          <option data-m="2">31 août 2026</option>
+          <option data-m="3">30 septembre 2026</option>
+          <option data-m="4">31 octobre 2026</option>
+          <option data-m="5">30 novembre 2026</option>
+          <option data-m="6" selected>31 décembre 2026</option>
+          <option data-m="9">31 mars 2027</option>
+          <option data-m="12">30 juin 2027</option>
+        </select>
+      </label></Fragment>
+    <div class="em-table-wrap" style="border:0;border-radius:0">
+      <table class="em-table">
+        <thead><tr><th>Type de congé</th><th class="em-cell-num">Solde actuel</th><th class="em-cell-num">Jours posés</th><th class="em-cell-num">À acquérir</th><th class="em-cell-num">Solde estimé</th></tr></thead>
+        <tbody id="proj-body"></tbody>
+      </table>
+    </div>
+    <div style="padding:var(--space-4) var(--space-6);border-top:1px solid var(--border-subtle);font-size:var(--text-xs);color:var(--text-tertiary)">Le congé annuel s’acquiert au rythme de <b>2,5 j ouvrables par mois</b> travaillé. Les jours posés correspondent aux congés déjà validés ou en attente sur la période.</div>
+  </Card>
+
+  <div class="hr-grid-2">
+    <!-- Demandes -->
+    <Card title="Mes demandes de congé" icon="i-list">
+    <Fragment slot="actions"><span class="em-table-meta">Année 2026</span></Fragment>
+      <div class="em-table-wrap" style="border:0;border-radius:0">
+        <table class="em-table">
+          <thead><tr><th>Type</th><th>Période</th><th class="em-cell-num">Jours</th><th>Statut</th></tr></thead>
+          <tbody>
+            {leaveReqs.map((l) => {
+              const st = LEAVE_STATUS[l.status];
+              return (
+                <tr><td><b>{l.type}</b></td><td>{l.period}</td><td class="em-cell-num">{l.days}</td><td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td></tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+  </Card>
+
+    <!-- À venir + politique -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      <Card title="À venir" icon="i-cal">
+        <div class="hr-list">
+          <div class="hr-list-row">
+            <span class="hr-list-ic leave"><Icon name="i-plane" cls="ico-sm" /></span>
+            <div class="hr-list-main"><div class="hr-list-tt">Congé annuel</div><div class="hr-list-meta">20 → 31 juillet · dans 34 jours</div></div>
+            <span class="em-badge em-badge--success em-badge--sm">10 j</span>
+          </div>
+          <div class="hr-list-row">
+            <span class="hr-list-ic"><Icon name="i-clock" cls="ico-sm" style="color:var(--warning-700)" /></span>
+            <div class="hr-list-main"><div class="hr-list-tt">Permission exceptionnelle</div><div class="hr-list-meta">3 juillet · en attente de validation</div></div>
+            <span class="em-badge em-badge--warning em-badge--sm">1 j</span>
+          </div>
+        </div>
+  </Card>
+      <div class="em-alert em-alert--neutral">
+        <span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span>
+        <div class="em-alert-body">
+          <div class="em-alert-title">Règles de congé</div>
+          <span class="em-alert-text">Congé annuel : 2,5 j ouvrables par mois travaillé (Code du travail béninois). Le congé maladie requiert un justificatif médical sous 48 h.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="hr-scrim" id="hr-scrim"></div>
+<Drawer id="drawer-conge" title="Demander un congé" sub="Votre demande sera transmise à votre manager pour validation.">
+    <div class="em-field">
+      <label class="em-field-label" for="dc-type">Type de congé</label>
+      <select class="em-select" id="dc-type">
+        {balances.map((b) => <option>{b.label} — {b.remaining} j restants</option>)}
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+      <div class="em-field"><label class="em-field-label" for="dc-from">Du</label><input class="em-input" id="dc-from" type="date" value="2026-08-10" /></div>
+      <div class="em-field"><label class="em-field-label" for="dc-to">Au</label><input class="em-input" id="dc-to" type="date" value="2026-08-14" /></div>
+    </div>
+    <div class="em-alert em-alert--info"><span class="em-alert-icon"><Icon name="i-clock" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text"><b>5 jours ouvrés</b> seront décomptés de votre solde de congé annuel.</span></div></div>
+    <div class="em-field"><label class="em-field-label" for="dc-note">Motif / commentaire <span style="font-weight:400;color:var(--text-tertiary)">(optionnel)</span></label><textarea class="em-textarea" id="dc-note" placeholder="Précisez si nécessaire…"></textarea></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande de congé transmise', true);">Envoyer la demande</button></Fragment>
+</Drawer>
+<script is:inline>
+  (function () {
+    var LEAVE = [
+      { t: 'Congé annuel', cur: 18, rate: 2.5, posed: 10 },
+      { t: 'Congé maladie', cur: 5, rate: 0, posed: 0 },
+      { t: 'Permission exceptionnelle', cur: 2, rate: 0, posed: 1 }
+    ];
+    function fmt(n) { return (Math.round(n * 10) / 10).toString().replace('.', ',') + ' j'; }
+    function render() {
+      var sel = document.getElementById('proj-month');
+      var m = parseInt(sel.options[sel.selectedIndex].getAttribute('data-m'), 10);
+      var body = document.getElementById('proj-body');
+      body.innerHTML = LEAVE.map(function (l) {
+        var acquis = l.rate * m;
+        var posed = m >= 1 ? l.posed : 0;
+        var est = l.cur + acquis - posed;
+        var estCls = est < 0 ? 'color:var(--error-700)' : (est <= 3 ? 'color:var(--warning-700)' : 'color:var(--text-primary)');
+        return '<tr><td><b>' + l.t + '</b></td>' +
+          '<td class="em-cell-num num">' + fmt(l.cur) + '</td>' +
+          '<td class="em-cell-num num" style="color:var(--text-tertiary)">−' + fmt(posed) + '</td>' +
+          '<td class="em-cell-num num" style="color:var(--success-700)">+' + fmt(acquis) + '</td>' +
+          '<td class="em-cell-num num" style="font-weight:700;' + estCls + '">' + fmt(est) + '</td></tr>';
+      }).join('');
+    }
+    document.getElementById('proj-month').addEventListener('change', render);
+    render();
+  })();
+</script>
+
+</Layout>

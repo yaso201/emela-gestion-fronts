@@ -1,0 +1,57 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import { getDocuments } from '@emela/shared/data';
+
+const documents = await getDocuments();
+---
+<Layout title="Mes documents — Espace personnel emela" page="documents">
+<style>
+  .doc-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+  @media (max-width:720px){ .doc-grid { grid-template-columns:1fr; } }
+  .doc-grid .em-doc-card { align-items:center; }
+  .doc-actions { margin-left:auto; display:flex; gap:var(--space-2); flex-shrink:0; }
+</style>
+
+
+
+<main class="hr-page">
+  <PageHead title="Mes documents RH" sub="Vos documents administratifs et attestations, générés par le service RH." />
+
+  <p class="hr-section-label">Documents disponibles</p>
+  <div class="doc-grid" style="margin-bottom:var(--space-9)">
+    {documents.map((d) => (
+      <div class="em-doc-card">
+        <span class:list={["em-doc-icon", d.accent && "em-doc-icon--accent"]}><Icon name={d.icon} cls="ico" /></span>
+        <div class="em-doc-body"><div class="em-doc-title">{d.title}</div><div class="em-doc-meta">{d.meta}</div></div>
+        <button class="em-btn em-btn--secondary em-btn--sm" onclick="hrToast('Téléchargement…')"><Icon name="i-download" cls="ico-sm" /></button>
+      </div>
+    ))}
+  </div>
+
+  <p class="hr-section-label">Demander un document</p>
+  <div class="em-card">
+    <div class="em-card-body" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-6);flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:var(--space-5)">
+        <span class="em-doc-icon em-doc-icon--accent"><Icon name="i-badge" cls="ico" /></span>
+        <div>
+          <div style="font-size:var(--text-base);font-weight:600;color:var(--text-primary)">Besoin d'une attestation ?</div>
+          <div style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:2px">Demande adressée au service RH — délai indicatif 48 h ouvrées.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--space-3);flex-wrap:wrap">
+        <button class="em-btn em-btn--secondary" onclick="hrToast('Demande envoyée au service RH', true)">Attestation de travail</button>
+        <button class="em-btn em-btn--secondary" onclick="hrToast('Demande envoyée au service RH', true)">Attestation de salaire</button>
+        <button class="em-btn em-btn--secondary" onclick="hrToast('Demande envoyée au service RH', true)">Certificat de travail</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="em-alert em-alert--neutral" style="margin-top:var(--space-7)">
+    <span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span>
+    <div class="em-alert-body"><span class="em-alert-text">Vos <b>bulletins de paie</b> sont consultables et téléchargeables depuis l'onglet <a href="/bulletins" style="color:var(--ink-700);font-weight:600">Mes bulletins</a>.</span></div>
+  </div>
+</main>
+
+</Layout>

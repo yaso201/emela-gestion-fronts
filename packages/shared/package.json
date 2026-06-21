@@ -1,0 +1,14 @@
+{
+  "name": "@emela/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Types domaine + accès aux données (source mock, branchable sur Frappe benin_hr)",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./data": "./src/data/index.ts",
+    "./rh-types": "./src/rh/types.ts",
+    "./rh-data": "./src/rh/data/index.ts"
+  },
+  "files": ["src"]
+}

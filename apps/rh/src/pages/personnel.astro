@@ -1,0 +1,98 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import Drawer from '../components/Drawer.astro';
+import { getDirectory, EMPLOYEE_STATUS, CONTRACT_TYPE } from '@emela/shared/rh-data';
+
+const directory = await getDirectory();
+const CONTRACT_VARIANT: Record<string, string> = { CDI: 'info', CDD: 'accent', 'Temps partiel': 'neutral', Apprentissage: 'neutral', Etranger: 'neutral' };
+const departments = [...new Set(directory.map((e) => e.department))];
+---
+<Layout title="Personnel — emela RH" page="personnel">
+<style is:global>
+  .toolbar { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; margin-bottom:var(--space-6); }
+  .toolbar .em-input-wrap { flex:1; min-width:240px; max-width:380px; }
+  .emp-name { display:flex; align-items:center; gap:var(--space-4); }
+  .emp-av { width:34px; height:34px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; }
+  .emp-name a { font-weight:600; color:var(--text-primary); text-decoration:none; }
+  .emp-name a:hover { color:var(--ink-700); text-decoration:underline; }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  @media (max-width:880px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div><h1>Annuaire du personnel</h1><p class="sub"><b>{directory.length}</b> agents actifs · Université LaNEM</p></div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--secondary" onclick="rhToast('Export de l\'annuaire…')"><svg class="ico-sm"><use href="#i-download"/></svg>Exporter</button>
+      <button class="em-btn em-btn--primary" data-roles="gest_rh admin" data-drawer-open="drawer-emp"><svg class="ico-sm"><use href="#i-plus"/></svg>Créer un salarié</button>
+    </div>
+  </div>
+
+  <div class="rh-rolebar readonly" data-roles="manager dir">
+    <span class="em-badge em-badge--neutral"><svg class="ico-sm"><use href="#i-eye"/></svg>Lecture seule</span>
+    <span data-rolebar-text>Consultation de l'annuaire. La création et la modification des dossiers relèvent du gestionnaire RH.</span>
+  </div>
+
+  <div class="toolbar">
+    <div class="em-input-wrap">
+      <span class="em-input-icon"><svg class="ico-sm"><use href="#i-search"/></svg></span>
+      <input class="em-input" type="search" placeholder="Rechercher un nom, matricule…" aria-label="Rechercher" />
+    </div>
+    <select class="em-select" style="max-width:210px" aria-label="Département"><option>Tous les départements</option>{departments.map((d) => <option>{d}</option>)}</select>
+    <select class="em-select" style="max-width:180px" aria-label="Type de contrat"><option>Tous contrats</option><option>CDI</option><option>CDD</option><option>Étranger</option><option>Apprentissage</option></select>
+    <select class="em-select" style="max-width:160px" aria-label="Statut"><option>Tous statuts</option><option>Actif</option><option>Suspendu</option></select>
+  </div>
+
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Salarié</th><th class="hide-md">Poste</th><th class="hide-md">Département</th><th>Contrat</th><th>Statut</th><th style="text-align:right">Action</th></tr></thead>
+      <tbody>
+        {directory.map((e) => {
+          const st = EMPLOYEE_STATUS[e.status];
+          return (
+            <tr>
+              <td><div class="emp-name"><span class="emp-av">{e.initials}</span><div><a href={`/fiche?id=${e.id}`}>{e.employeeName}</a><div class="mono-sm">{e.id}</div></div></div></td>
+              <td class="hide-md">{e.designation}</td><td class="hide-md">{e.department}</td>
+              <td>{e.contractType ? <span class:list={["em-badge", `em-badge--${CONTRACT_VARIANT[e.contractType]}`, "em-badge--sm"]}>{CONTRACT_TYPE[e.contractType]}</span> : <span class="mono-sm">—</span>}</td>
+              <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
+              <td style="text-align:right"><a class="em-btn em-btn--secondary em-btn--sm" href={`/fiche?id=${e.id}`}>Ouvrir</a></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    <div class="em-pagination">
+      <button class="em-pagination-btn" aria-label="Précédent"><svg class="ico-sm" style="transform:rotate(180deg)"><use href="#i-caret"/></svg></button>
+      <button class="em-pagination-btn" aria-current="page">1</button>
+      <button class="em-pagination-btn">2</button>
+      <button class="em-pagination-btn">3</button>
+      <span style="color:var(--text-tertiary);padding:0 var(--space-3)">…</span>
+      <button class="em-pagination-btn">49</button>
+      <button class="em-pagination-btn" aria-label="Suivant"><svg class="ico-sm"><use href="#i-caret"/></svg></button>
+    </div>
+  </div>
+</main>
+
+<!-- Drawer création salarié -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<Drawer id="drawer-emp" title="Créer un salarié" sub="Le matricule PERS-… est attribué automatiquement.">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+    <div class="em-field"><label class="em-field-label">Prénom</label><input class="em-input" placeholder="Prénom" /></div>
+    <div class="em-field"><label class="em-field-label">Nom</label><input class="em-input" placeholder="Nom" /></div>
+  </div>
+  <div class="em-field"><label class="em-field-label">Poste</label><input class="em-input" placeholder="ex. Maître-assistant" /></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+    <div class="em-field"><label class="em-field-label">Département</label><select class="em-select">{departments.map((d) => <option>{d}</option>)}</select></div>
+    <div class="em-field"><label class="em-field-label">Catégorie salariale</label><select class="em-select"><option>Cadre</option><option>Agent de maîtrise</option><option>Employé</option><option>Ouvrier</option></select></div>
+  </div>
+  <div class="em-field"><label class="em-field-label">N° d'immatriculation CNSS</label><input class="em-input" placeholder="0000 000 000" /></div>
+  <div class="em-alert em-alert--info"><span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text">Le contrat de travail se crée ensuite depuis l'onglet <b>Contrats</b>.</span></div></div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Salarié créé', true);">Créer le dossier</button>
+  </Fragment>
+</Drawer>
+
+</Layout>

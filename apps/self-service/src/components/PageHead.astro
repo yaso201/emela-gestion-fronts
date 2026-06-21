@@ -1,0 +1,17 @@
+---
+// En-tête de page (.hr-pagehead) : titre + sous-titre + actions optionnelles (slot "actions").
+interface Props {
+  title: string;
+  /** sous-titre — HTML autorisé (ex. <b>…</b>) */
+  sub?: string;
+}
+const { title, sub } = Astro.props;
+const hasActions = Astro.slots.has('actions');
+---
+<div class="hr-pagehead">
+  <div>
+    <h1>{title}</h1>
+    {sub && <p set:html={sub} />}
+  </div>
+  {hasActions && <div class="hr-pagehead-actions"><slot name="actions" /></div>}
+</div>

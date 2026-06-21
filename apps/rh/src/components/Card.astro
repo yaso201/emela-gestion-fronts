@@ -1,0 +1,22 @@
+---
+import Icon from './Icon.astro';
+
+// Carte de contenu (.rh-card) avec en-tête optionnel (slot "actions").
+interface Props {
+  title?: string;
+  icon?: string;
+  class?: string;
+  style?: string;
+}
+const { title, icon, class: extra, style } = Astro.props;
+const hasHead = !!title || Astro.slots.has('actions');
+---
+<div class:list={["rh-card", extra]} style={style}>
+  {hasHead && (
+    <div class="rh-card-head">
+      <span class="rh-card-title">{icon && <Icon name={icon} cls="ico-sm" style="color:var(--text-tertiary)" />}{title}</span>
+      <slot name="actions" />
+    </div>
+  )}
+  <slot />
+</div>

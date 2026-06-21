@@ -1,0 +1,140 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getEmployee, getContracts, EMPLOYEE_STATUS, CONTRACT_STATUS, CONTRACT_TYPE, fcfa } from '@emela/shared/rh-data';
+
+const id = Astro.url.searchParams.get('id') ?? 'HR-EMP-0042';
+const emp = await getEmployee(id);
+const empStatus = EMPLOYEE_STATUS[emp.status];
+const contract = (await getContracts()).find((c) => c.employee === emp.id) ?? null;
+const CONTRACT_VARIANT: Record<string, string> = { CDI: 'info', CDD: 'accent', 'Temps partiel': 'neutral', Apprentissage: 'neutral', Etranger: 'neutral' };
+const fmtDate = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+---
+<Layout title="Fiche salarié — emela RH" page="personnel">
+<style is:global>
+  .fiche-hero { display:flex; align-items:center; gap:var(--space-6); padding:var(--space-7); background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); margin-bottom:var(--space-6); flex-wrap:wrap; }
+  .fiche-av { width:64px; height:64px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:22px; flex-shrink:0; }
+  .fiche-id { flex:1; min-width:200px; }
+  .fiche-id h1 { font-family:var(--font-display); font-size:var(--text-xl); font-weight:700; letter-spacing:-.01em; margin:0; }
+  .fiche-id .meta { font-size:var(--text-sm); color:var(--text-secondary); margin-top:var(--space-3); display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+  .fiche-id .meta .mono { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  .fiche-actions { display:flex; gap:var(--space-3); flex-shrink:0; flex-wrap:wrap; }
+
+  .dl { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5) var(--space-6); padding:var(--space-6); }
+  @media (max-width:560px){ .dl { grid-template-columns:1fr; } }
+  .dl .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.07em; color:var(--text-tertiary); font-weight:600; }
+  .dl .v { font-size:var(--text-sm); font-weight:500; color:var(--text-primary); margin-top:3px; }
+  .dl .v.mono { font-family:var(--font-mono); }
+  .dl .full { grid-column:1 / -1; }
+
+  .tl { padding:var(--space-5) var(--space-6); display:flex; flex-direction:column; gap:0; }
+  .tl-item { display:flex; gap:var(--space-4); padding-bottom:var(--space-5); position:relative; }
+  .tl-item:not(:last-child)::before { content:''; position:absolute; left:6px; top:16px; bottom:0; width:2px; background:var(--border-default); }
+  .tl-dot { width:14px; height:14px; border-radius:50%; background:var(--ink-200); border:3px solid var(--surface-paper); box-shadow:0 0 0 1px var(--border-strong); flex-shrink:0; margin-top:3px; z-index:1; }
+  .tl-dot.act { background:var(--success-500); box-shadow:0 0 0 1px var(--success-500); }
+  .tl-main .t { font-size:var(--text-sm); font-weight:600; }
+  .tl-main .d { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+  .mini-leave { display:flex; flex-direction:column; gap:var(--space-4); padding:var(--space-6); }
+  .mini-leave .row { display:flex; align-items:center; gap:var(--space-4); }
+  .mini-leave .row .lbl { font-size:var(--text-sm); flex:1; }
+  .mini-leave .row .track { width:90px; height:6px; border-radius:999px; background:var(--sand-100); overflow:hidden; }
+  .mini-leave .row .track i { display:block; height:100%; border-radius:999px; }
+  .mini-leave .row .v { font-family:var(--font-mono); font-size:var(--text-xs); font-weight:600; width:48px; text-align:right; }
+</style>
+
+<main class="rh-page">
+  <nav class="em-breadcrumb rh-crumb"><a href="/personnel">Personnel</a><span class="em-breadcrumb-sep">/</span><span class="em-breadcrumb-current">{emp.employeeName}</span></nav>
+
+  <div class="fiche-hero">
+    <div class="fiche-av">{emp.initials}</div>
+    <div class="fiche-id">
+      <h1>{emp.employeeName}</h1>
+      <div class="meta"><span>{emp.designation} · Département {emp.department}</span><span class:list={["em-badge", `em-badge--${empStatus.variant}`]}><span class="em-badge-dot"></span>{empStatus.label}</span>{emp.contractType && <span class:list={["em-badge", `em-badge--${CONTRACT_VARIANT[emp.contractType]}`, "em-badge--sm"]}>{CONTRACT_TYPE[emp.contractType]}</span>}<span class="mono">{emp.id}</span></div>
+    </div>
+    <div class="fiche-actions">
+      <button class="em-btn em-btn--secondary" data-roles="gest_rh admin" onclick="rhToast('Mode édition…')"><svg class="ico-sm"><use href="#i-pencil"/></svg>Modifier</button>
+      <a class="em-btn em-btn--secondary" data-roles="gest_rh dir admin" href="/separations"><svg class="ico-sm"><use href="#i-door"/></svg>Initier une séparation</a>
+    </div>
+  </div>
+
+  <div class="rh-grid-2">
+    <!-- Colonne principale -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-users"/></svg>Informations personnelles</span></div>
+        <div class="dl">
+          <div><div class="k">Date de naissance</div><div class="v">12 mars 1981 · 45 ans</div></div>
+          <div><div class="k">Genre</div><div class="v">Masculin</div></div>
+          <div><div class="k">Situation familiale</div><div class="v">Marié(e)</div></div>
+          <div><div class="k">Nationalité / statut</div><div class="v">National (Bénin)</div></div>
+          <div class="full"><div class="k">Adresse e-mail professionnelle</div><div class="v mono">mahougnon.akplogan@lanem.bj</div></div>
+          <div><div class="k">Téléphone</div><div class="v mono">+229 01 97 00 00 00</div></div>
+          <div><div class="k">Résidence</div><div class="v">Abomey-Calavi</div></div>
+        </div>
+      </div>
+
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-coins"/></svg>Données de paie &amp; contrat</span><span class="em-badge em-badge--neutral em-badge--sm">Champs localisés D10</span></div>
+        <div class="dl">
+          <div><div class="k">Catégorie salariale</div><div class="v">Cadre</div></div>
+          <div><div class="k">Régime de risque professionnel</div><div class="v">Risque faible — 1 %</div></div>
+          <div><div class="k">Profil de paie</div><div class="v">Enseignant-chercheur</div></div>
+          <div><div class="k">N° d'immatriculation CNSS</div><div class="v mono">0123 847 561</div></div>
+          <div><div class="k">Date d'ancienneté</div><div class="v">1<sup>er</sup> octobre 2019 · 6 ans 8 mois</div></div>
+          <div><div class="k">Convention</div><div class="v">Enseignement supérieur</div></div>
+        </div>
+      </div>
+
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-doc"/></svg>Contrat actif</span><a class="rh-card-link" href="/contrats">Voir le contrat<svg class="ico-sm"><use href="#i-caret"/></svg></a></div>
+        {contract ? (
+          <div class="dl">
+            <div><div class="k">Type de contrat</div><div class="v">{CONTRACT_TYPE[contract.contractType]}</div></div>
+            <div><div class="k">Référence</div><div class="v mono">{contract.id}</div></div>
+            <div><div class="k">Date de début</div><div class="v">{fmtDate(contract.startDate)}</div></div>
+            <div><div class="k">{contract.endDate ? 'Date de fin' : "Période d'essai"}</div><div class="v">{contract.endDate ? fmtDate(contract.endDate) : 'Terminée'}</div></div>
+            <div><div class="k">Salaire de base mensuel</div><div class="v num">{fcfa(contract.baseSalary)}</div></div>
+            <div><div class="k">Statut</div><div class="v"><span class:list={["em-badge", `em-badge--${CONTRACT_STATUS[contract.status].variant}`, "em-badge--sm"]}><span class="em-badge-dot"></span>{CONTRACT_STATUS[contract.status].label}</span></div></div>
+          </div>
+        ) : (
+          <div style="padding:var(--space-6)"><div class="em-alert em-alert--neutral" style="margin:0"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Aucun contrat actif rattaché à ce dossier.</span></div></div></div>
+        )}
+      </div>
+    </div>
+
+    <!-- Colonne latérale -->
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-shieldcheck"/></svg>Statut de protection</span></div>
+        <div style="padding:var(--space-6)">
+          <div class="em-alert em-alert--neutral" style="margin:0">
+            <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span>
+            <div class="em-alert-body"><span class="em-alert-text"><b>Aucune protection active.</b> Les cas protégés (maternité, maladie longue, représentant du personnel) conditionnent les contrôles bloquants en séparation (D10 §21).</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-cal"/></svg>Soldes de congés</span></div>
+        <div class="mini-leave">
+          <div class="row"><span class="lbl">Congé annuel</span><span class="track"><i style="width:60%;background:var(--ink-700)"></i></span><span class="v">18/30</span></div>
+          <div class="row"><span class="lbl">Congé maladie</span><span class="track"><i style="width:71%;background:var(--success-500)"></i></span><span class="v">5/7</span></div>
+          <div class="row"><span class="lbl">Permission</span><span class="track"><i style="width:20%;background:var(--accent-500)"></i></span><span class="v">2/10</span></div>
+        </div>
+      </div>
+
+      <div class="rh-card">
+        <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-clock"/></svg>Historique</span></div>
+        <div class="tl">
+          <div class="tl-item"><span class="tl-dot act"></span><div class="tl-main"><div class="t">Augmentation indiciaire</div><div class="d">1<sup>er</sup> janv. 2024 · base portée à 485 000 F</div></div></div>
+          <div class="tl-item"><span class="tl-dot"></span><div class="tl-main"><div class="t">Promotion — Maître-assistant</div><div class="d">1<sup>er</sup> oct. 2022</div></div></div>
+          <div class="tl-item"><span class="tl-dot"></span><div class="tl-main"><div class="t">Fin de période d'essai</div><div class="d">31 déc. 2019</div></div></div>
+          <div class="tl-item"><span class="tl-dot"></span><div class="tl-main"><div class="t">Création du dossier · CDI signé</div><div class="d">1<sup>er</sup> oct. 2019</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="rh-scrim" id="rh-scrim"></div>
+
+</Layout>

@@ -1,0 +1,59 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import { getContract, fcfa } from '@emela/shared/data';
+
+const contract = await getContract();
+---
+<Layout title="Mes contrats — Espace personnel emela" page="mes-contrats">
+<style>
+  .dl { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-5) var(--space-6); padding:var(--space-6); }
+  @media (max-width:560px){ .dl { grid-template-columns:1fr; } }
+  .dl .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.07em; color:var(--text-tertiary); font-weight:600; }
+  .dl .v { font-size:var(--text-sm); font-weight:500; color:var(--text-primary); margin-top:3px; }
+  .dl .v.mono { font-family:var(--font-mono); }
+  .num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+</style>
+
+<main class="hr-page hr-page--narrow">
+  <PageHead title="Mes contrats" sub="Votre contrat en cours et l'historique de vos engagements." />
+
+  <p class="hr-section-label">Contrat en cours</p>
+  <Card title="CDI — Contrat à durée indéterminée" icon="i-doc" style="margin-bottom:var(--space-8)">
+    <Fragment slot="actions"><StatusBadge variant="success">Actif</StatusBadge></Fragment>
+    <div class="dl">
+      <div><div class="k">Référence</div><div class="v mono">{contract.reference}</div></div>
+      <div><div class="k">Profil de paie</div><div class="v">{contract.payProfile}</div></div>
+      <div><div class="k">Date de début</div><div class="v">{contract.startDate}</div></div>
+      <div><div class="k">Période d'essai</div><div class="v">{contract.trialPeriod}</div></div>
+      <div><div class="k">Salaire de base mensuel</div><div class="v num">{fcfa(contract.baseSalary)}</div></div>
+      <div><div class="k">Ancienneté</div><div class="v">{contract.seniority}</div></div>
+    </div>
+    <div style="padding:var(--space-5) var(--space-6);border-top:1px solid var(--border-subtle);display:flex;gap:var(--space-3);flex-wrap:wrap">
+      <button class="em-btn em-btn--primary" onclick="hrToast('Téléchargement du contrat (PDF)…')"><Icon name="i-download" cls="ico-sm" />Télécharger mon contrat</button>
+      <button class="em-btn em-btn--secondary" onclick="hrToast('Demande envoyée aux RH', true)">Poser une question</button>
+    </div>
+  </Card>
+
+  <p class="hr-section-label">Historique</p>
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Type</th><th>Période</th><th>Statut</th><th style="text-align:right">Document</th></tr></thead>
+      <tbody>
+        {contract.history.map((c) => (
+          <tr>
+            <td><b>{c.kind}</b>{c.label ? ` — ${c.label}` : ''}</td>
+            <td>{c.period}</td>
+            <td><StatusBadge variant={c.statusVariant} sm>{c.status}</StatusBadge></td>
+            <td style="text-align:right"><button class="em-btn em-btn--ghost em-btn--sm" onclick="hrToast('Téléchargement…')"><Icon name="i-download" cls="ico-sm" />PDF</button></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+</Layout>

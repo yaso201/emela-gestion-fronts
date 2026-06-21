@@ -1,0 +1,99 @@
+---
+import '@emela/design-system/index.css';
+import '../styles/shell.css';
+import Sprite from '../components/Sprite.astro';
+import Icon from '../components/Icon.astro';
+import { getCurrentUser } from '@emela/shared/data';
+
+interface Props {
+  title: string;
+  /** Clé de page active (ex. "dashboard", "conges", "profil") */
+  page?: string;
+}
+const { title, page = '' } = Astro.props;
+
+// Utilisateur connecté (source de données — mock en démo, Frappe en prod).
+const USER = await getCurrentUser();
+
+// Arborescence de navigation de l'espace personnel.
+type NavItem = { item: string; icon: string; page: string; href: string; counter?: string };
+type NavNode = NavItem | { group: string; children: NavItem[] };
+const NAV: NavNode[] = [
+  { item: 'Tableau de bord', icon: 'i-gauge', page: 'dashboard', href: '/' },
+  { group: 'Mon temps', children: [
+    { item: 'Mes congés', icon: 'i-plane', page: 'conges', href: '/conges', counter: '1' },
+    { item: 'Calendrier', icon: 'i-cal', page: 'calendrier', href: '/calendrier' },
+  ]},
+  { group: 'Ma carrière', children: [
+    { item: 'Mes évaluations', icon: 'i-star', page: 'evaluations', href: '/evaluations' },
+  ]},
+  { group: 'Mes documents', children: [
+    { item: 'Mes bulletins', icon: 'i-file', page: 'bulletins', href: '/bulletins' },
+    { item: 'Mes contrats', icon: 'i-doc', page: 'mes-contrats', href: '/mes-contrats' },
+    { item: 'Mes autres documents', icon: 'i-folder', page: 'documents', href: '/documents' },
+    { item: 'Faire une demande', icon: 'i-list', page: 'demandes', href: '/demandes' },
+  ]},
+  { item: 'Mon profil', icon: 'i-user', page: 'profil', href: '/profil' },
+];
+
+// Aplatissement pour le rendu (label de groupe + items).
+type NavRow =
+  | { type: 'label'; label: string }
+  | { type: 'item'; item: string; icon: string; page: string; href: string; counter?: string; sub: boolean };
+const navRows: NavRow[] = [];
+for (const node of NAV) {
+  if ('group' in node) {
+    navRows.push({ type: 'label', label: node.group });
+    for (const c of node.children) navRows.push({ type: 'item', sub: true, ...c });
+  } else {
+    navRows.push({ type: 'item', sub: false, ...node });
+  }
+}
+---
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/assets/lanem-logo.webp" />
+    <title>{title}</title>
+  </head>
+  <body data-page={page}>
+    <!-- Sprite central des icônes -->
+    <Sprite />
+
+    <!-- Barre mobile (< 900px) -->
+    <div class="nav-mbar">
+      <button class="nav-burger" aria-label="Menu" data-nav-toggle><Icon name="i-menu" /></button>
+      <span class="mark">emela<span>.</span></span>
+      <div class="nav-mbar-actions">
+        <button class="nav-mbar-btn" data-mbar="notif" aria-label="Notifications"><Icon name="i-bell" /><span class="nub"></span></button>
+        <button class="nav-mbar-btn" data-mbar="logout" aria-label="Se déconnecter"><Icon name="i-signout" /></button>
+      </div>
+    </div>
+
+    <!-- Barre latérale (rendue côté serveur) -->
+    <aside class="nav-side">
+      <a class="nav-brand" href="/"><span class="mark">emela<span>.</span></span><span class="ctx">Espace perso</span></a>
+      <nav class="nav-scroll">
+        {navRows.map((row) => row.type === 'label' ? (
+          <div class="nav-grouplabel">{row.label}</div>
+        ) : (
+          <a class:list={["nav-item", { "is-sub": row.sub, "is-active": row.page === page }]} href={row.href}>
+            <Icon name={row.icon} />
+            <span class="lbl">{row.item}</span>
+            {row.counter && <span class="em-counter">{row.counter}</span>}
+          </a>
+        ))}
+      </nav>
+      <a class="nav-user" href="/profil"><span class="av">{USER.initials}</span><span><span class="nm">{USER.name}</span><span class="rl">{USER.role}</span></span></a>
+    </aside>
+
+    <!-- Voile du menu mobile -->
+    <div class="nav-scrim" data-nav-close></div>
+
+    <slot />
+
+    <script is:inline src="/scripts/shell.js"></script>
+  </body>
+</html>

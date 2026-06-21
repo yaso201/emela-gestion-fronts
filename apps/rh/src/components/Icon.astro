@@ -1,0 +1,11 @@
+---
+// Icône du châssis RH — pointe vers un <symbol> du Sprite central.
+interface Props {
+  name: string;
+  /** ico (18) · ico-sm (15) · ico-lg (22), classes additionnelles autorisées */
+  cls?: string;
+  style?: string;
+}
+const { name, cls = 'ico', style } = Astro.props;
+---
+<svg class={cls} style={style}><use href={`#${name}`}></use></svg>

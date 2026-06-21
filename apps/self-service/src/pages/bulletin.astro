@@ -1,0 +1,159 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import { getEmployee, getPayslipDetail } from '@emela/shared/data';
+
+const emp = await getEmployee();
+const slip = await getPayslipDetail(Astro.url.searchParams.get('id') ?? '');
+const nf = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
+const cell = (v?: number | null) => (v == null ? '—' : nf(v));
+---
+<Layout title={`Bulletin de paie — ${slip.period} — emela`} page="bulletins">
+<style is:global>
+  .num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  /* En-tête bulletin */
+  .slip { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; }
+  .slip-head { display:flex; justify-content:space-between; gap:var(--space-7); padding:var(--space-7); border-bottom:1px solid var(--border-subtle); flex-wrap:wrap; }
+  .slip-emp .em-name { font-family:var(--font-display); font-size:var(--text-md); font-weight:700; }
+  .slip-emp .em-sub { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:2px; line-height:1.5; }
+  .slip-id { text-align:right; }
+  .slip-id .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.08em; color:var(--text-tertiary); }
+  .slip-id .v { font-size:var(--text-sm); font-weight:600; margin-top:1px; }
+  .slip-id .v code { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--ink-700); }
+
+  /* Récap strip */
+  .recap { display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1px solid var(--border-subtle); }
+  .recap > div { padding:var(--space-6) var(--space-7); border-right:1px solid var(--border-subtle); }
+  .recap > div:last-child { border-right:0; }
+  .recap .k { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.08em; color:var(--text-tertiary); }
+  .recap .v { font-family:var(--font-display); font-size:24px; font-weight:700; letter-spacing:-.02em; margin-top:var(--space-3); font-variant-numeric:tabular-nums; }
+  .recap .net { background:linear-gradient(160deg,var(--ink-900),var(--ink-800)); color:#fff; }
+  .recap .net .k { color:var(--accent-200); }
+  .recap .net .v { color:#fff; }
+  @media (max-width:820px){ .recap { grid-template-columns:repeat(2,1fr); } .recap > div:nth-child(2){ border-right:0; } }
+
+  /* Tables rubriques */
+  .slip-sec { padding:var(--space-7); }
+  .slip-sec + .slip-sec { border-top:1px solid var(--border-subtle); }
+  .slip-sec h3 { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.1em; color:var(--text-tertiary); font-weight:700; margin:0 0 var(--space-4); }
+  table.rub { width:100%; border-collapse:collapse; }
+  table.rub th, table.rub td { padding:var(--space-4) var(--space-3); font-size:var(--text-sm); border-bottom:1px solid var(--border-subtle); text-align:right; }
+  table.rub th { font-size:var(--text-2xs); text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); font-weight:600; }
+  table.rub th:first-child, table.rub td:first-child { text-align:left; }
+  table.rub td:first-child { font-weight:500; color:var(--text-primary); }
+  table.rub tr.total td { font-weight:700; border-top:1.5px solid var(--border-strong); border-bottom:0; }
+  table.rub tr.total td:first-child { color:var(--text-primary); }
+  table.rub .muted { color:var(--text-tertiary); }
+  table.rub td.gain { color:var(--success-700); }
+
+  details.journal { border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; margin-top:var(--space-6); background:var(--surface-paper); }
+  details.journal > summary { list-style:none; cursor:pointer; padding:var(--space-5) var(--space-7); display:flex; align-items:center; justify-content:space-between; gap:var(--space-4); }
+  details.journal > summary::-webkit-details-marker { display:none; }
+  details.journal > summary .t { font-size:var(--text-base); font-weight:600; display:flex; align-items:center; gap:var(--space-3); }
+  details.journal > summary .chev { transition:transform var(--duration-fast) var(--ease-out); color:var(--text-tertiary); }
+  details.journal[open] > summary .chev { transform:rotate(90deg); }
+  .journal-body { padding:0 var(--space-7) var(--space-7); }
+  table.steps { width:100%; border-collapse:collapse; }
+  table.steps td { padding:var(--space-3) var(--space-4); font-size:var(--text-sm); border-bottom:1px solid var(--border-subtle); }
+  table.steps td:first-child { color:var(--text-secondary); }
+  table.steps td:first-child b { color:var(--text-tertiary); font-family:var(--font-mono); font-size:var(--text-2xs); margin-right:var(--space-3); }
+  table.steps td:last-child { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-weight:500; }
+  table.steps tr:last-child td { border-bottom:0; }
+</style>
+
+<main class="hr-page hr-page--narrow">
+  <nav class="em-breadcrumb hr-crumb"><a href="/bulletins">Mes bulletins</a><span class="em-breadcrumb-sep">/</span><span class="em-breadcrumb-current">{slip.period}</span></nav>
+  <div class="hr-pagehead">
+    <div><h1>Bulletin de paie — {slip.period}</h1><p>Période du <b>{slip.periodLabel}</b> · payé le {slip.issuedOn} · réf. <span class="num" style="font-size:var(--text-xs)">{slip.reference}</span></p></div>
+    <div class="hr-pagehead-actions">
+      <button class="em-btn em-btn--secondary" onclick="hrToast('Impression…')"><Icon name="i-print" cls="ico-sm" />Imprimer</button>
+      <button class="em-btn em-btn--primary" onclick="hrToast('Téléchargement du PDF…')"><Icon name="i-download" cls="ico-sm" />Télécharger le PDF</button>
+    </div>
+  </div>
+
+  <div class="slip">
+    <div class="slip-head">
+      <div class="slip-emp">
+        <div class="em-name">Université LaNEM</div>
+        <div class="em-sub">Laboratoire National d'Enseignement et de Méthodes — Abomey-Calavi, Bénin<br>IFU 3 2018 1234 5678 · Affiliation CNSS employeur 0042 118 007</div>
+      </div>
+      <div class="slip-id">
+        <div class="k">Salarié</div><div class="v">{emp.name}</div>
+        <div style="margin-top:var(--space-4)" class="k">Matricule · CNSS</div><div class="v"><code>{emp.matricule}</code> · <code>{emp.cnss}</code></div>
+        <div style="margin-top:var(--space-4)" class="k">Emploi · Profil</div><div class="v">{emp.position} · {emp.payProfile}</div>
+      </div>
+    </div>
+
+    <div class="recap">
+      <div><div class="k">Salaire brut</div><div class="v num">{nf(slip.gross)} F</div></div>
+      <div><div class="k">Retenues salariales</div><div class="v num">−{nf(slip.deductions)} F</div></div>
+      <div class="net"><div class="k">Net à payer</div><div class="v num">{nf(slip.net)} F</div></div>
+      <div><div class="k">Coût employeur</div><div class="v num">{nf(slip.employerCost)} F</div></div>
+    </div>
+
+    <!-- Rémunération brute -->
+    <div class="slip-sec">
+      <h3>Rémunération brute</h3>
+      <table class="rub">
+        <thead><tr><th>Rubrique</th><th>Base</th><th>Taux</th><th>Montant</th></tr></thead>
+        <tbody>
+          {slip.earnings.map((e) => (
+            <tr><td>{e.label}</td><td class="num muted">—</td><td class="num muted">—</td><td class="num gain">{nf(e.amount ?? 0)}</td></tr>
+          ))}
+          <tr class="total"><td>Salaire brut</td><td></td><td></td><td class="num">{nf(slip.gross)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Cotisations & retenues -->
+    <div class="slip-sec">
+      <h3>Cotisations sociales &amp; retenues</h3>
+      <table class="rub">
+        <thead><tr><th>Rubrique</th><th>Base</th><th>Taux</th><th>Part salariale</th><th>Part patronale</th></tr></thead>
+        <tbody>
+          {slip.deductionLines.map((d) => (
+            <tr>
+              <td>{d.label}</td>
+              <td class:list={["num", !d.base || d.base === 'forfait' ? 'muted' : '']}>{d.base ?? '—'}</td>
+              <td class:list={["num", !d.rate || d.rate === '—' ? 'muted' : '']}>{d.rate ?? '—'}</td>
+              <td class:list={["num", d.employee == null && 'muted']}>{cell(d.employee)}</td>
+              <td class:list={["num", d.employer == null && 'muted']}>{cell(d.employer)}</td>
+            </tr>
+          ))}
+          <tr class="total"><td>Totaux</td><td></td><td></td><td class="num">{nf(slip.totals.employee)}</td><td class="num">{nf(slip.totals.employer)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Net -->
+    <div class="slip-sec" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-5);flex-wrap:wrap;background:var(--sand-25)">
+      <div>
+        <div style="font-size:var(--text-2xs);text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);font-weight:700">Net à payer</div>
+        <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:4px">Salaire brut {nf(slip.gross)} − retenues salariales {nf(slip.deductions)}</div>
+      </div>
+      <div class="num" style="font-family:var(--font-display);font-size:32px;font-weight:800;letter-spacing:-.02em">{nf(slip.net)} F</div>
+    </div>
+  </div>
+
+  <!-- Journal de calcul -->
+  <details class="journal">
+    <summary>
+      <span class="t"><Icon name="i-shield" cls="ico-sm" style="color:var(--ink-700)" />Journal de calcul — moteur de paie</span>
+      <svg class="ico chev"><use href="#i-caret"/></svg>
+    </summary>
+    <div class="journal-body">
+      <div class="em-alert em-alert--info" style="margin-bottom:var(--space-5)">
+        <span class="em-alert-icon"><Icon name="i-lock" cls="ico-sm" /></span>
+        <div class="em-alert-body"><span class="em-alert-text">Détail des {slip.journal.length} étapes de calcul figées par le serveur. Valeurs en lecture seule — l'interface n'effectue aucun calcul.</span></div>
+      </div>
+      <table class="steps">
+        {slip.journal.map((s, i) => (
+          <tr><td><b>{String(i + 1).padStart(2, '0')}</b>{s.label}</td><td>{nf(s.value)} F</td></tr>
+        ))}
+      </table>
+    </div>
+  </details>
+</main>
+
+</Layout>

@@ -1,0 +1,103 @@
+---
+import Layout from '../layouts/SelfServiceLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import PageHead from '../components/PageHead.astro';
+import Drawer from '../components/Drawer.astro';
+import { getRequests, REQUEST_STATUS, REQUEST_CATEGORY, fcfa } from '@emela/shared/data';
+
+const requests = await getRequests();
+const total = requests.length;
+const pending = requests.filter((r) => r.status === 'pending').length;
+---
+<Layout title="Mes demandes — Espace personnel emela" page="demandes">
+<style>
+  .num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .filters { display:flex; gap:var(--space-3); flex-wrap:wrap; margin-bottom:var(--space-6); }
+</style>
+
+<main class="hr-page">
+  <PageHead title="Mes demandes" sub="Suivi de toutes vos demandes : congés, acomptes, notes de frais et attestations.">
+    <button slot="actions" class="em-btn em-btn--primary" data-drawer-open="drawer-demande"><Icon name="i-plus" cls="ico-sm" />Nouvelle demande</button>
+  </PageHead>
+
+  <div class="filters">
+    <button class="em-chip is-active">Toutes <span class="em-counter" style="background:rgba(255,255,255,.25)">{total}</span></button>
+    <button class="em-chip">Congés</button>
+    <button class="em-chip">Acomptes</button>
+    <button class="em-chip">Notes de frais</button>
+    <button class="em-chip">Attestations</button>
+    <button class="em-chip">En attente <span class="em-counter em-counter--alert">{pending}</span></button>
+  </div>
+
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Objet</th><th>Service</th><th>Déposée le</th><th class="em-cell-num">Montant</th><th>Statut</th></tr></thead>
+      <tbody>
+        {requests.map((r) => {
+          const cat = REQUEST_CATEGORY[r.category];
+          const st = REQUEST_STATUS[r.status];
+          return (
+            <tr>
+              <td><b>{r.subject}</b>{r.detail && <div style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:2px">{r.detail}</div>}</td>
+              <td><span class:list={["em-badge", `em-badge--${cat.variant}`, "em-badge--sm"]}>{cat.icon && <Icon name={cat.icon} cls="ico-sm" />}{cat.label}</span></td>
+              <td>{r.date}</td>
+              <td class:list={["em-cell-num", "num", { muted: r.amount == null }]}>{r.amount == null ? '—' : fcfa(r.amount)}</td>
+              <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="hr-scrim" id="hr-scrim"></div>
+
+<Drawer id="drawer-demande" title="Nouvelle demande" sub="Acompte, note de frais ou attestation.">
+  <div class="em-field">
+    <label class="em-field-label" for="dd-type">Type de demande</label>
+    <select class="em-select" id="dd-type">
+      <optgroup label="Finances">
+        <option value="acompte">Acompte sur salaire</option>
+        <option value="frais">Note de frais</option>
+      </optgroup>
+      <optgroup label="Attestations">
+        <option value="att-travail">Attestation de travail</option>
+        <option value="att-assiduite">Attestation d'assiduité</option>
+        <option value="att-mission">Attestation de bonne exécution de mission d'enseignement</option>
+      </optgroup>
+    </select>
+  </div>
+  <div class="em-alert em-alert--info" id="dd-att-note" hidden><span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text">Demande adressée au service RH — délai indicatif <b>48 h ouvrées</b>. Le document signé sera disponible dans <a href="/documents" style="color:var(--ink-700);font-weight:600">Mes documents</a>.</span></div></div>
+  <div class="em-field" id="dd-amt-field"><label class="em-field-label" for="dd-amt">Montant (FCFA)</label><input class="em-input" id="dd-amt" inputmode="numeric" placeholder="ex. 150 000" /></div>
+  <div class="em-field"><label class="em-field-label" for="dd-obj">Objet / justification</label><textarea class="em-textarea" id="dd-obj" placeholder="Précisez le motif de la demande…"></textarea></div>
+  <div class="em-field" id="dd-justif-field">
+    <label class="em-field-label">Justificatif <span style="font-weight:400;color:var(--text-tertiary)">(notes de frais)</span></label>
+    <label class="em-file-drop"><input type="file" /><span class="em-file-drop-icon"><Icon name="i-receipt" cls="ico-lg" /></span><span class="em-file-drop-title">Joindre un reçu</span><span class="em-file-drop-hint">PDF, JPG ou PNG — 5 Mo max</span></label>
+  </div>
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande déposée', true);">Déposer la demande</button>
+  </Fragment>
+</Drawer>
+
+<script is:inline>
+(function(){
+  var sel = document.getElementById('dd-type');
+  if(!sel) return;
+  var amt = document.getElementById('dd-amt-field');
+  var justif = document.getElementById('dd-justif-field');
+  var note = document.getElementById('dd-att-note');
+  function sync(){
+    var isAtt = sel.value.indexOf('att-') === 0;
+    amt.hidden = isAtt;
+    justif.hidden = isAtt;
+    note.hidden = !isAtt;
+  }
+  sel.addEventListener('change', sync);
+  sync();
+})();
+</script>
+
+</Layout>
