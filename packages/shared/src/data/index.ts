@@ -13,6 +13,7 @@ import type {
   RequestStatus, RequestCategory, LeaveRequestStatus, Colleague, Notification, Presence, Contract, HrDocument, PayslipDetail, Evaluation, CalendarEvent, Holiday,
 } from '../types';
 import * as mock from './mock';
+import { frappeSource } from '../client/frappe';
 
 // ---- Source mock (démo) ----
 const mockSource: DataSource = {
@@ -32,8 +33,9 @@ const mockSource: DataSource = {
   getHolidays:      async () => mock.holidays,
 };
 
-// 🔌 Source active. Remplacer par `frappeSource` pour brancher le back.
-const source: DataSource = mockSource;
+// 🔌 Source active = back benin_hr (SSR). Repasser à `mockSource` pour la démo.
+void mockSource;
+const source: DataSource = frappeSource;
 
 export const getCurrentUser = (): Promise<CurrentUser> => source.getCurrentUser();
 export const getEmployee = (): Promise<Employee> => source.getEmployee();

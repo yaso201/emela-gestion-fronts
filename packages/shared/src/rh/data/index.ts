@@ -13,6 +13,7 @@ import type {
   RhEvaluationStatus, SeparationKind, SeparationStage,
 } from '../types';
 import * as mock from './mock';
+import { frappeSource } from '../client/frappe';
 
 const mockSource: RhDataSource = {
   getKpis:               async () => mock.kpis,
@@ -29,8 +30,9 @@ const mockSource: RhDataSource = {
   getPayrollParameters:  async () => mock.payrollParameters,
 };
 
-// 🔌 Source active. Remplacer par `frappeSource` pour brancher le back.
-const source: RhDataSource = mockSource;
+// 🔌 Source active = back benin_hr (SSR). Repasser à `mockSource` pour la démo.
+void mockSource;
+const source: RhDataSource = frappeSource;
 
 export const getKpis = (): Promise<RhKpi[]> => source.getKpis();
 export const getDirectory = (): Promise<DirectoryEmployee[]> => source.getDirectory();

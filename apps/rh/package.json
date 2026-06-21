@@ -11,9 +11,10 @@
     "astro": "astro"
   },
   "dependencies": {
-    "astro": "^5.6.0",
+    "@astrojs/cloudflare": "^12.6.13",
     "@emela/design-system": "workspace:*",
-    "@emela/shared": "workspace:*"
+    "@emela/shared": "workspace:*",
+    "astro": "^5.6.0"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",

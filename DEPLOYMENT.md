@@ -19,49 +19,35 @@ données `mock → frappe`, **(c)** régler l'auth (même origine recommandée).
 
 ---
 
-## 1. ⚠️ Décision structurante : STATIQUE vs SSR
+## 1. Rendu : SSR (✅ ACTIF)
 
-Les `astro.config.mjs` sont **vides → sortie STATIQUE** par défaut. En statique, le code de
-frontmatter d'une page (`const x = await getX()`) s'exécute **au BUILD**, pas par requête.
+Les 2 apps sont en **SSR** (`output: 'server'`, adapter **`@astrojs/cloudflare`** v12) : le code de
+frontmatter (`const x = await getX()`) s'exécute **PAR REQUÊTE**, ce qui propage la session de
+l'utilisateur au back → chaque salarié voit SES données (indispensable avec `frappeSource`).
 
-| Mode | Effet | Usage |
+| Mode | Effet | Statut |
 |---|---|---|
-| **Statique (actuel)** + `mockSource` | données de démo **figées dans le HTML** au build | démo / maquette |
-| **Statique** + `frappeSource` | ❌ fetch **au build**, **sans session utilisateur** → données fausses/vides | À NE PAS faire |
-| **SSR** + `frappeSource` | ✅ frontmatter exécuté **par requête**, propage le cookie de session de l'utilisateur | **PRODUCTION** |
-| Statique + fetch **client** | ✅ données chargées dans le navigateur (`<script>`) | alternative SPA |
+| **SSR + `frappeSource`** | frontmatter par requête, session propagée | ✅ **configuré (prod)** |
+| Statique + `mockSource` | données de démo figées au build | démo (repasser `source = mockSource`) |
+| Statique + `frappeSource` | ❌ fetch au build sans session → faux | à ne pas faire |
 
-**Pour une production multi-utilisateurs (chaque salarié voit SES données), il faut le SSR.**
-
-### Activer le SSR
-```bash
-# Cloudflare (convention LaNEM) :
-pnpm --filter @emela/self-service add @astrojs/cloudflare
-pnpm --filter @emela/rh add @astrojs/cloudflare
-```
-```js
-// apps/<app>/astro.config.mjs
-import { defineConfig } from 'astro/config';
-import cloudflare from '@astrojs/cloudflare';
-export default defineConfig({ output: 'server', adapter: cloudflare() });
-```
-> Alternative serveur Node : `@astrojs/node` (`adapter: node({ mode: 'standalone' })`).
+> Alternative serveur Node si vous ne déployez pas sur Cloudflare : remplacer l'adapter par
+> `@astrojs/node` (`adapter: node({ mode: 'standalone' })`) dans `apps/*/astro.config.mjs`.
+> NB Cloudflare : un avertissement « binding SESSION » peut apparaître (feature session
+> expérimentale d'Astro, non utilisée ici) ; sans impact tant que les pages n'appellent pas
+> `Astro.session`.
 
 ---
 
-## 2. Basculer les données mock → benin_hr
+## 2. Source de données : `frappeSource` (✅ ACTIF)
 
-Une seule ligne par sous-domaine :
+La source active est **`frappeSource`** dans les deux `index.ts` (`mockSource` conservé pour
+revenir à la démo : remettre `const source = mockSource`).
 ```ts
-// packages/shared/src/data/index.ts          (self-service)
-import { frappeSource } from '../client/frappe';
-const source: DataSource = frappeSource;       // au lieu de mockSource
-
-// packages/shared/src/rh/data/index.ts        (rh)
-import { frappeSource } from '../client/frappe';
-const source: RhDataSource = frappeSource;
+// packages/shared/src/{,rh/}data/index.ts
+const source: DataSource = frappeSource;   // ← actif (back benin_hr)
 ```
-**Aucune page à modifier.** Les clients ciblent déjà la surface back RÉELLE (méthodes
+**Aucune page à modifier.** Les clients ciblent la surface back RÉELLE (méthodes
 whitelistées `cockpit.*`/`analytics.*`/`declarations.*`/`get_team_pending`/`retirement_*`
 + REST `/api/resource` scopé par les permissions back). Voir le tableau **BACK-GAP** du
 README principal pour les getters encore en repli vide (à combler côté back si l'écran les exige).
@@ -118,9 +104,9 @@ selon l'option retenue. Garder `pnpm check` **bloquant** (0 erreur exigé).
 
 ## 7. Checklist de mise en production
 
-- [ ] `pnpm install && pnpm check && pnpm build` — vert.
-- [ ] Choisir **SSR** (adapter) si données par-utilisateur ; configurer `astro.config`.
-- [ ] Basculer `mockSource → frappeSource` (2 lignes).
+- [x] `pnpm install && pnpm check && pnpm build` — vert (SSR).
+- [x] **SSR** activé (`output: 'server'` + adapter Cloudflare v12 sur les 2 apps).
+- [x] Source = `frappeSource` (back benin_hr) dans les 2 `data/index.ts`.
 - [ ] `PUBLIC_FRAPPE_URL` réglée (vide si même origine).
 - [ ] Auth : même origine (reverse-proxy) **ou** CORS+cookies/token (cross-origin).
 - [ ] Brancher `hrLogout` + redirection de connexion.
