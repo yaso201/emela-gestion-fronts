@@ -1,149 +1,26 @@
 ---
 import Layout from '../layouts/RhLayout.astro';
-import StatusBadge from '../components/StatusBadge.astro';
-import { getEvaluations, EVALUATION_STATUS } from '@emela/shared/rh-data';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
 
-const evaluations = await getEvaluations();
-const stepLabel: Record<string, string> = { planifiee: 'Entretien planifié', en_cours: 'Auto-évaluation reçue', validee: 'Clôturée' };
+// Descopé de la v1 (décision F4) : l'appréciation RH (entretien annuel) n'est pas
+// encore construite côté back. Elle sera développée intégralement dans benin_hr lors
+// d'un round ultérieur (doctype Entretien annuel + workflow auto-éval → synthèse
+// manager → contresignature). teaching_eval = éval pédagogique étudiante, hors sujet.
 ---
 <Layout title="Évaluations — emela RH" page="evaluations">
-<style is:global>
-  .emp-name { display:flex; align-items:center; gap:var(--space-3); }
-  .scale { display:flex; gap:4px; }
-  .scale button { width:32px; height:32px; border:1px solid var(--border-default); background:var(--surface-paper); border-radius:var(--radius-sm); font-size:var(--text-sm); font-weight:600; color:var(--text-secondary); cursor:pointer; }
-  .scale button:hover { border-color:var(--ink-600); }
-  .scale button.on { background:var(--ink-800); border-color:var(--ink-800); color:#fff; }
-  .comp { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-4) 0; border-top:1px solid var(--border-subtle); }
-  .comp:first-child { border-top:0; }
-  .comp .nm { flex:1; font-size:var(--text-sm); font-weight:500; }
-  .comp .selfv { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); white-space:nowrap; }
-  .seqbar { display:flex; gap:var(--space-2); flex-wrap:wrap; margin-bottom:var(--space-6); }
-  .seq { display:flex; align-items:center; gap:var(--space-2); padding:5px 12px; border-radius:var(--radius-full); font-size:var(--text-xs); font-weight:600; background:var(--sand-100); color:var(--sand-600); }
-  .seq.done { background:var(--success-50); color:var(--success-700); } .seq.cur { background:var(--ink-800); color:#fff; }
-  .seq .d { width:6px; height:6px; border-radius:50%; background:currentColor; }
-</style>
-
-<main class="rh-page">
-  <div class="rh-pagehead">
-    <div><h1 id="ev-title">Évaluations</h1><p class="sub" id="ev-sub">Campagne d'entretiens annuels 2026.</p></div>
-    <div class="rh-pagehead-actions">
-      <button class="em-btn em-btn--primary" data-roles="gest_rh dir admin" data-drawer-open="drawer-camp"><svg class="ico-sm"><use href="#i-plus"/></svg>Lancer une campagne</button>
+<main class="hr-page">
+  <PageHead title="Évaluations" sub="Campagnes d'entretien annuel et comptes-rendus." />
+  <Card>
+    <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+      <Icon name="i-star" cls="ico-lg" />
+      <h2 style="margin:var(--space-4) 0 var(--space-2);font-size:var(--text-md);color:var(--text-secondary)">Module à venir</h2>
+      <p style="font-size:var(--text-sm);max-width:46ch;margin:0 auto">
+        La gestion des entretiens annuels d'évaluation (campagnes, auto-évaluations,
+        comptes-rendus et contresignatures) sera disponible prochainement.
+      </p>
     </div>
-  </div>
-
-  <!-- Vue RH / Direction : campagne -->
-  <section data-roles="gest_rh dir admin">
-    <section class="rh-grid-4" style="margin-bottom:var(--space-7)">
-      <div class="em-kpi"><span class="em-kpi-label">Collaborateurs</span><span class="em-kpi-value num">342</span><span class="em-kpi-meta">campagne 2026</span></div>
-      <div class="em-kpi"><span class="em-kpi-label">Auto-évaluations reçues</span><span class="em-kpi-value num">218</span><span class="em-kpi-meta">64 %</span></div>
-      <div class="em-kpi"><span class="em-kpi-label">Entretiens menés</span><span class="em-kpi-value num">96</span><span class="em-kpi-meta">28 %</span></div>
-      <div class="em-kpi"><span class="em-kpi-label">Comptes-rendus validés</span><span class="em-kpi-value num">64</span><span class="em-kpi-meta">19 %</span></div>
-    </section>
-    <div class="rh-card" style="margin-bottom:var(--space-7)">
-      <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-star"/></svg>Campagnes</span></div>
-      <div>
-        <div class="rh-row"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-star"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Entretiens annuels 2026</div><div class="rh-row-meta">Ouverte le 1ᵉʳ juin · clôture le 31 juillet</div></div><span class="em-badge em-badge--warning"><span class="em-badge-dot"></span>En cours</span></div>
-        <div class="rh-row"><span class="rh-row-av" style="background:var(--success-50);color:var(--success-700)"><svg class="ico-sm"><use href="#i-check"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Entretiens annuels 2025</div><div class="rh-row-meta">340 collaborateurs · 100 % validés</div></div><span class="em-badge em-badge--success"><span class="em-badge-dot"></span>Clôturée</span></div>
-      </div>
-    </div>
-    <div class="em-alert em-alert--neutral"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Séquence : <b>auto-évaluation</b> du collaborateur → <b>entretien</b> manager → <b>compte-rendu</b> &amp; objectifs N+1 → <b>contresignature</b> du collaborateur. La RH suit l'avancement, les managers conduisent les entretiens.</span></div></div>
-  </section>
-
-  <!-- Vue Manager : évaluations de l'équipe -->
-  <section data-roles="manager">
-    <div class="seqbar">
-      <span class="seq done"><span class="d"></span>Auto-évaluation</span>
-      <span class="seq cur"><span class="d"></span>Entretien</span>
-      <span class="seq"><span class="d"></span>Compte-rendu</span>
-      <span class="seq"><span class="d"></span>Validation collaborateur</span>
-    </div>
-    <div class="em-table-wrap">
-      <div class="em-table-toolbar"><span class="em-table-title">Mon équipe — campagne 2026</span><span class="em-table-meta">5 collaborateurs · 2 à évaluer</span></div>
-      <table class="em-table">
-        <thead><tr><th>Collaborateur</th><th>Étape</th><th class="em-cell-num">Auto-éval</th><th>Statut</th><th style="text-align:right">Action</th></tr></thead>
-        <tbody>
-          {evaluations.map((ev) => {
-            const st = EVALUATION_STATUS[ev.status];
-            return (
-              <tr>
-                <td><div class="emp-name"><span class="rh-row-av">{ev.employeeName.split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>{ev.employeeName}</div></td>
-                <td>{stepLabel[ev.status]}</td>
-                <td class="em-cell-num num" style={ev.score ? '' : 'color:var(--text-tertiary)'}>{ev.score ?? '—'}</td>
-                <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
-                <td style="text-align:right">{ev.status === 'planifiee' && !ev.score
-                  ? <button class="em-btn em-btn--secondary em-btn--sm" onclick={`rhToast('Relance envoyée à ${ev.employeeName}', true)`}>Relancer</button>
-                  : <button class="em-btn em-btn--primary em-btn--sm" data-drawer-open="drawer-eval">{ev.status === 'validee' ? 'Voir' : 'Évaluer'}</button>}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  </section>
+  </Card>
 </main>
-
-<!-- Drawer : évaluer un collaborateur -->
-<div class="rh-scrim" id="rh-scrim"></div>
-<aside class="rh-drawer" id="drawer-eval" role="dialog" aria-modal="true" aria-labelledby="de-title">
-  <div class="rh-drawer-head">
-    <div><h3 id="de-title">Évaluer — Gisèle Fanou</h3><p>Entretien annuel 2026 · Assistante</p></div>
-    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
-  </div>
-  <div class="rh-drawer-body">
-    <div class="em-alert em-alert--info" style="margin:0"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Auto-évaluation reçue le 12 juin (auto-note <b>4,0/5</b>). Comparez puis posez votre évaluation.</span></div></div>
-
-    <div>
-      <div class="rh-section-label">Évaluation des compétences</div>
-      <div class="comp"><span class="nm">Qualité du travail</span><span class="selfv">auto 4</span><div class="scale" data-scale></div></div>
-      <div class="comp"><span class="nm">Esprit d'équipe</span><span class="selfv">auto 5</span><div class="scale" data-scale></div></div>
-      <div class="comp"><span class="nm">Autonomie</span><span class="selfv">auto 3</span><div class="scale" data-scale></div></div>
-      <div class="comp"><span class="nm">Communication</span><span class="selfv">auto 4</span><div class="scale" data-scale></div></div>
-    </div>
-
-    <div class="em-field"><label class="em-field-label">Synthèse de l'entretien</label><textarea class="em-textarea" placeholder="Points forts, axes de progrès, faits marquants…"></textarea></div>
-    <div class="em-field"><label class="em-field-label">Objectifs 2027</label><textarea class="em-textarea" placeholder="2 à 3 objectifs mesurables…"></textarea></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
-      <div class="em-field"><label class="em-field-label">Date d'entretien</label><input class="em-input" type="date" value="2026-06-20" /></div>
-      <div class="em-field"><label class="em-field-label">Besoin de formation</label><select class="em-select"><option>Aucun</option><option>Bureautique avancée</option><option>Gestion de projet</option></select></div>
-    </div>
-  </div>
-  <div class="rh-drawer-foot">
-    <button class="em-btn em-btn--secondary" onclick="RhDrawer.close(); rhToast('Brouillon enregistré', true);">Enregistrer</button>
-    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Compte-rendu transmis pour signature', true);"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Transmettre pour signature</button>
-  </div>
-</aside>
-
-<!-- Drawer : lancer une campagne -->
-<aside class="rh-drawer" id="drawer-camp" role="dialog" aria-modal="true" aria-labelledby="dcp-title">
-  <div class="rh-drawer-head">
-    <div><h3 id="dcp-title">Lancer une campagne</h3><p>Diffuse la grille et ouvre les auto-évaluations.</p></div>
-    <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
-  </div>
-  <div class="rh-drawer-body">
-    <div class="em-field"><label class="em-field-label">Intitulé</label><input class="em-input" value="Entretiens annuels 2026" /></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
-      <div class="em-field"><label class="em-field-label">Ouverture</label><input class="em-input" type="date" value="2026-06-01" /></div>
-      <div class="em-field"><label class="em-field-label">Clôture</label><input class="em-input" type="date" value="2026-07-31" /></div>
-    </div>
-    <div class="em-field"><label class="em-field-label">Périmètre</label><select class="em-select"><option>Tous les agents (342)</option><option>Enseignants-chercheurs</option><option>Personnel administratif</option></select></div>
-    <div class="em-field"><label class="em-field-label">Grille de compétences</label><select class="em-select"><option>Grille standard LaNEM (5 compétences)</option><option>Grille enseignants-chercheurs</option></select></div>
-  </div>
-  <div class="rh-drawer-foot">
-    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
-    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Campagne lancée', true);">Lancer</button>
-  </div>
-</aside>
-<script is:inline>
-  window.onRhRole = function (role) {
-    var t = document.getElementById('ev-title'), s = document.getElementById('ev-sub');
-    if (role === 'manager') { t.textContent = 'Évaluations de mon équipe'; s.textContent = 'Conduisez les entretiens annuels de vos collaborateurs.'; }
-    else { t.textContent = 'Campagne d\u2019évaluation'; s.textContent = 'Pilotage de la campagne d\u2019entretiens annuels 2026.'; }
-  };
-  var preset = [4, 4, 3, 4];
-  document.querySelectorAll('[data-scale]').forEach(function (sc, idx) {
-    for (var i = 1; i <= 5; i++) { var b = document.createElement('button'); b.type='button'; b.textContent=i; if(i===preset[idx]) b.classList.add('on'); sc.appendChild(b); }
-    sc.addEventListener('click', function (e) { var btn=e.target.closest('button'); if(!btn) return; sc.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===btn);}); });
-  });
-</script>
-
 </Layout>

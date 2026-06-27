@@ -1,0 +1,147 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import { getPendingValidations, fcfa } from '@emela/shared/rh-data';
+import type { PendingValidations } from '@emela/shared/rh-data';
+
+const MONTHS = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+let pending: PendingValidations = { scope: 'none', acomptes: [], heures_sup: [], notes_de_frais: [], conges: [], attestations: [] };
+let fetchError = false;
+try {
+  pending = await getPendingValidations();
+} catch {
+  fetchError = true;
+}
+const total = pending.acomptes.length + pending.notes_de_frais.length + pending.heures_sup.length + pending.conges.length + pending.attestations.length;
+---
+<Layout title="Demandes à valider — emela RH" page="demandes">
+<style is:global>
+  .pv-row { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-5) var(--space-6); border-top:1px solid var(--border-subtle); }
+  .pv-row:first-child { border-top:0; }
+  .pv-ic { width:34px; height:34px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; background:var(--ink-50); color:var(--ink-700); flex-shrink:0; }
+  .pv-main { flex:1; min-width:0; }
+  .pv-main .t { font-size:var(--text-sm); font-weight:600; }
+  .pv-main .m { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+  .pv-act { display:flex; gap:var(--space-3); flex-shrink:0; }
+</style>
+<main class="hr-page">
+  <PageHead title="Demandes à valider" sub="Acomptes, notes de frais et heures supplémentaires en attente de votre validation." />
+
+  {fetchError ? (
+    <Card>
+      <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+        <Icon name="i-warning" cls="ico-lg" />
+        <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Impossible de charger les demandes pour le moment. Réessayez plus tard.</p>
+      </div>
+    </Card>
+  ) : total === 0 ? (
+    <Card>
+      <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+        <Icon name="i-list" cls="ico-lg" />
+        <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Aucune demande en attente de validation.</p>
+      </div>
+    </Card>
+  ) : (
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      {pending.acomptes.length > 0 && (
+        <Card title={`Acomptes (${pending.acomptes.length})`} icon="i-coins">
+          {pending.acomptes.map((a) => (
+            <div class="pv-row">
+              <span class="pv-ic"><Icon name="i-coins" cls="ico-sm" /></span>
+              <div class="pv-main"><div class="t">{a.employee_name}</div><div class="m">{fcfa(a.amount ?? 0)} · demandé le {a.request_date}</div></div>
+              <div class="pv-act">
+                <button class="em-btn em-btn--secondary em-btn--sm" data-act="acompte" data-name={a.name} data-approve="false">Refuser</button>
+                <button class="em-btn em-btn--primary em-btn--sm" data-act="acompte" data-name={a.name} data-approve="true">Approuver</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {pending.notes_de_frais.length > 0 && (
+        <Card title={`Notes de frais (${pending.notes_de_frais.length})`} icon="i-list">
+          {pending.notes_de_frais.map((f) => (
+            <div class="pv-row">
+              <span class="pv-ic"><Icon name="i-list" cls="ico-sm" /></span>
+              <div class="pv-main"><div class="t">{f.employee_name}</div><div class="m">{f.category} · {fcfa(f.amount ?? 0)} · {f.expense_date}</div></div>
+              <div class="pv-act">
+                <button class="em-btn em-btn--secondary em-btn--sm" data-act="note-de-frais" data-name={f.name} data-approve="false">Refuser</button>
+                <button class="em-btn em-btn--primary em-btn--sm" data-act="note-de-frais" data-name={f.name} data-approve="true">Valider</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {pending.heures_sup.length > 0 && (
+        <Card title={`Heures supplémentaires (${pending.heures_sup.length})`} icon="i-clock">
+          {pending.heures_sup.map((h) => (
+            <div class="pv-row">
+              <span class="pv-ic"><Icon name="i-clock" cls="ico-sm" /></span>
+              <div class="pv-main"><div class="t">{h.employee_name}</div><div class="m">Période {MONTHS[parseInt(h.period_month ?? '0', 10)]} {h.period_year}{h.amount ? ` · ${fcfa(h.amount)}` : ''}</div></div>
+              <div class="pv-act">
+                <button class="em-btn em-btn--secondary em-btn--sm" data-act="heures-sup" data-name={h.name} data-approve="false">Refuser</button>
+                <button class="em-btn em-btn--primary em-btn--sm" data-act="heures-sup" data-name={h.name} data-approve="true">Valider</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {pending.conges.length > 0 && (
+        <Card title={`Congés (${pending.conges.length})`} icon="i-cal">
+          {pending.conges.map((c) => (
+            <div class="pv-row">
+              <span class="pv-ic"><Icon name="i-cal" cls="ico-sm" /></span>
+              <div class="pv-main"><div class="t">{c.employee_name}</div><div class="m">{c.leave_type} · {c.from_date} → {c.to_date}{c.total_leave_days ? ` · ${c.total_leave_days} j` : ''}</div></div>
+              <div class="pv-act">
+                <button class="em-btn em-btn--secondary em-btn--sm" data-act="conge" data-name={c.name} data-approve="false">Refuser</button>
+                <button class="em-btn em-btn--primary em-btn--sm" data-act="conge" data-name={c.name} data-approve="true">Approuver</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+      {pending.attestations.length > 0 && (
+        <Card title={`Attestations (${pending.attestations.length})`} icon="i-stamp">
+          {pending.attestations.map((a) => (
+            <div class="pv-row">
+              <span class="pv-ic"><Icon name="i-stamp" cls="ico-sm" /></span>
+              <div class="pv-main"><div class="t">{a.employee_name}</div><div class="m">Attestation {a.attestation_type} · demandée le {a.request_date}</div></div>
+              <div class="pv-act">
+                <button class="em-btn em-btn--secondary em-btn--sm" data-act="attestation" data-name={a.name} data-approve="false">Refuser</button>
+                <button class="em-btn em-btn--primary em-btn--sm" data-act="attestation" data-name={a.name} data-approve="true">Délivrer</button>
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  )}
+</main>
+
+<script is:inline>
+  // Validation/refus → POST /api/validations/<type>. Le back vérifie l'autorisation
+  // (is_authorized_approver) et la séparation des tâches.
+  (function () {
+    function setDisabled(name, state) {
+      document.querySelectorAll('[data-name="' + name + '"]').forEach(function (b) { b.disabled = state; });
+    }
+    document.querySelectorAll('[data-act]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var type = btn.getAttribute('data-act');
+        var name = btn.getAttribute('data-name');
+        var approve = btn.getAttribute('data-approve') === 'true';
+        setDisabled(name, true);
+        try {
+          var res = await fetch('/api/validations/' + type, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, approve: approve }),
+          });
+          var data = await res.json().catch(function () { return {}; });
+          if (res.ok) { rhToast(approve ? 'Demande validée' : 'Demande refusée', true); setTimeout(function () { location.reload(); }, 700); }
+          else { rhToast(data.error || 'Échec de la validation', false); setDisabled(name, false); }
+        } catch (e) { rhToast('Erreur réseau', false); setDisabled(name, false); }
+      });
+    });
+  })();
+</script>
+</Layout>

@@ -52,8 +52,8 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
         <div class="decl-line total"><span class="k"><b>Total à reverser CNSS</b></span><span class="v">37 520 000 F</span></div>
       </div>
       <div class="decl-foot" data-roles="paie admin">
+        <button class="em-btn em-btn--secondary decl-gen" data-method="generate_cnss_declaration" data-params='{"year":"2026","quarter":"T2"}'><svg class="ico-sm"><use href="#i-refresh"/></svg>Générer l'état</button>
         <button class="em-btn em-btn--secondary" onclick="rhToast('Génération du bordereau CNSS (PDF)…')"><svg class="ico-sm"><use href="#i-download"/></svg>Bordereau PDF</button>
-        <button class="em-btn em-btn--secondary" onclick="rhToast('Export tableur CNSS…')"><svg class="ico-sm"><use href="#i-download"/></svg>Tableur</button>
         <button class="em-btn em-btn--primary" onclick="rhToast('Déclaration CNSS transmise', true)" style="margin-left:auto"><svg class="ico-sm"><use href="#i-arrowright"/></svg>Transmettre</button>
       </div>
     </div>
@@ -71,9 +71,9 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
         <div class="decl-line"><span class="k">Salariés concernés</span><span class="v">331</span></div>
         <div class="decl-line total"><span class="k"><b>Total reversé à l'État</b></span><span class="v">14 646 000 F</span></div>
       </div>
-      <div class="decl-foot">
+      <div class="decl-foot" data-roles="paie admin">
+        <button class="em-btn em-btn--secondary decl-gen" data-method="generate_its_declaration" data-params='{"year":"2026","month":"05"}'><svg class="ico-sm"><use href="#i-refresh"/></svg>Générer l'état</button>
         <button class="em-btn em-btn--secondary" onclick="rhToast('Téléchargement de l\'état ITS (PDF)…')"><svg class="ico-sm"><use href="#i-download"/></svg>État PDF</button>
-        <button class="em-btn em-btn--secondary" onclick="rhToast('Téléchargement de l\'accusé de transmission…')"><svg class="ico-sm"><use href="#i-check"/></svg>Accusé de réception</button>
       </div>
     </div>
   </div>
@@ -81,9 +81,9 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
   <!-- États sociaux -->
   <p class="rh-section-label">États sociaux &amp; registres</p>
   <div class="rh-card" style="margin-bottom:var(--space-8)">
-    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération du registre des salaires…')"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-list"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Registre des salaires</div><div class="rh-row-meta">Document annuel obligatoire · exercice 2026</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
-    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération de la déclaration nominative…')"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-users"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Déclaration individuelle nominative (DISA)</div><div class="rh-row-meta">CNSS annuelle · récapitulatif par salarié</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
-    <a class="rh-row" href="javascript:void(0)" onclick="rhToast('Génération du récapitulatif annuel ITS…')"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-megaphone"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Récapitulatif annuel ITS</div><div class="rh-row-meta">État fiscal de fin d'exercice</div></div><button class="em-btn em-btn--secondary em-btn--sm" data-roles="paie admin"><svg class="ico-sm"><use href="#i-download"/></svg>Générer</button></a>
+    <div class="rh-row"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-list"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Registre des salaires</div><div class="rh-row-meta">Document annuel obligatoire · exercice 2026</div></div><button class="em-btn em-btn--secondary em-btn--sm decl-gen" data-roles="paie admin" data-method="generate_salary_register" data-params='{"year":"2026"}'><svg class="ico-sm"><use href="#i-refresh"/></svg>Générer</button></div>
+    <div class="rh-row"><span class="rh-row-av" style="background:var(--ink-50);color:var(--ink-700)"><svg class="ico-sm"><use href="#i-users"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Déclaration individuelle nominative (DISA)</div><div class="rh-row-meta">CNSS annuelle · récapitulatif par salarié</div></div><button class="em-btn em-btn--secondary em-btn--sm decl-gen" data-roles="paie admin" data-method="generate_nominative_declaration" data-params='{"year":"2026","quarter":"T2"}'><svg class="ico-sm"><use href="#i-refresh"/></svg>Générer</button></div>
+    <div class="rh-row"><span class="rh-row-av" style="background:var(--accent-50);color:var(--accent-700)"><svg class="ico-sm"><use href="#i-megaphone"/></svg></span><div class="rh-row-main"><div class="rh-row-tt">Récapitulatif annuel ITS</div><div class="rh-row-meta">État fiscal de fin d'exercice</div></div><button class="em-btn em-btn--secondary em-btn--sm decl-gen" data-roles="paie admin" data-method="generate_its_annual_recap" data-params='{"year":"2026"}'><svg class="ico-sm"><use href="#i-refresh"/></svg>Générer</button></div>
   </div>
 
   <!-- Historique -->
@@ -108,5 +108,33 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
     </table>
   </div>
 </main>
+
+<script is:inline>
+  // Génération à la demande : POST /api/declarations/generate (back gate DECLARATION_ROLES).
+  (function () {
+    document.addEventListener('click', async function (e) {
+      var btn = e.target.closest('.decl-gen');
+      if (!btn) return;
+      e.preventDefault();
+      var method = btn.getAttribute('data-method');
+      var params = {};
+      try { params = JSON.parse(btn.getAttribute('data-params') || '{}'); } catch (_) {}
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/declarations/generate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ method: method, params: params }),
+        });
+        var d = await res.json();
+        if (!res.ok) { rhToast(d.error || 'Échec de la génération', false); return; }
+        var type = d.declaration_type || 'État';
+        var period = d.period || '';
+        var n = Array.isArray(d.lignes) ? d.lignes.length : null;
+        rhToast(type + (period ? ' ' + period : '') + ' générée' + (n != null ? ' — ' + n + ' ligne(s)' : ''), true);
+      } catch (err) { rhToast('Erreur réseau', false); }
+      finally { btn.disabled = false; }
+    });
+  })();
+</script>
 
 </Layout>

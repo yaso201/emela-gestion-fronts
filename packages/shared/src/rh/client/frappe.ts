@@ -17,6 +17,7 @@ import type {
   ValidationItem, Declaration, RhEvaluation, Separation, DocumentTemplate, PayrollParameter,
   EmployeeStatus, ContractStatus, ContractType, PayrollRunStatus,
 } from '../types';
+import { authHeaders } from '../../session';
 
 // Base API : relatif par défaut (même origine, ex. reverse-proxy sous le domaine
 // Frappe) ; surchargeable en cross-origin via PUBLIC_FRAPPE_URL.
@@ -26,7 +27,7 @@ const BASE = `${ROOT}/api`;
 async function method<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`${BASE}/method/${path}${qs ? `?${qs}` : ''}`, {
-    headers: { Accept: 'application/json' }, credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeaders() },
   });
   if (!res.ok) throw new Error(`benin_hr ${path} → ${res.status}`);
   return (await res.json()).message as T;
@@ -40,11 +41,157 @@ async function resource<T = any[]>(
     limit_page_length: '0', ...(order_by ? { order_by } : {}),
   }).toString();
   const res = await fetch(`${BASE}/resource/${encodeURIComponent(doctype)}?${qs}`, {
-    headers: { Accept: 'application/json' }, credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeaders() },
   });
   if (!res.ok) throw new Error(`benin_hr ${doctype} → ${res.status}`);
   return ((await res.json()).data ?? []) as T;
 }
+
+const SELF = 'benin_hr.api.self_requests';
+
+/** Écriture POST (validation RH/MSS) avec forward du jeton CSRF de la session. */
+async function writeMethod<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const csrf = (await method<{ csrf_token: string }>('benin_hr.api.cockpit.get_csrf_token'))?.csrf_token;
+  const res = await fetch(`${BASE}/method/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json',
+      'X-Frappe-CSRF-Token': csrf ?? '', ...authHeaders(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`benin_hr ${path} → ${res.status}`);
+  return (await res.json()).message as T;
+}
+
+export type PendingRow = {
+  name: string; employee: string; employee_name: string; amount?: number;
+  request_date?: string; expense_date?: string; category?: string;
+  period_month?: string; period_year?: string;
+  leave_type?: string; from_date?: string; to_date?: string; total_leave_days?: number;
+  attestation_type?: string;
+};
+export type PendingValidations = {
+  scope: 'hr' | 'team' | 'none';
+  acomptes: PendingRow[]; heures_sup: PendingRow[]; notes_de_frais: PendingRow[];
+  conges: PendingRow[]; attestations: PendingRow[];
+};
+
+/** Demandes en attente que l'utilisateur connecté est autorisé à valider. */
+export const getPendingValidations = (): Promise<PendingValidations> =>
+  method('benin_hr.api.cockpit.get_pending_validations');
+
+export type DecisionResult = { name: string; status: string };
+
+/** Validation/refus RH/MSS d'une demande d'acompte. */
+export const decideAcompte = (name: string, approve: boolean): Promise<DecisionResult> =>
+  writeMethod(`${SELF}.decide_acompte`, { name, approve });
+
+/** Validation/refus d'une note de frais. */
+export const decideNoteDeFrais = (name: string, approve: boolean): Promise<DecisionResult> =>
+  writeMethod(`${SELF}.decide_note_de_frais`, { name, approve });
+
+/** Validation/refus d'une saisie d'heures supplémentaires. */
+export const decideHeuresSup = (name: string, approve: boolean): Promise<DecisionResult> =>
+  writeMethod(`${SELF}.decide_heures_sup`, { name, approve });
+
+/** Validation/refus d'une demande de congé (Leave Application HRMS). */
+export const decideConge = (name: string, approve: boolean): Promise<DecisionResult> =>
+  writeMethod(`${SELF}.decide_conge`, { name, approve });
+
+/** Délivrance/refus d'une demande d'attestation. */
+export const decideAttestation = (name: string, approve: boolean): Promise<DecisionResult> =>
+  writeMethod(`${SELF}.decide_attestation`, { name, approve });
+
+/** Onboarding contraint : crée/complète un compte + rôles (whitelist back). */
+export const provisionUser = (input: {
+  email: string; full_name: string; roles: string[]; employee?: string;
+}): Promise<{ user: string; roles: string[]; employee: string | null }> =>
+  writeMethod('benin_hr.api.provisioning.provision_user', input);
+
+/** Édition d'un paramètre de paie (config — Gestion-SM/admin ; POST + CSRF). */
+export const updatePayrollParameter = (parameter_key: string, parameter_value: string): Promise<{ parameter_key: string; parameter_value: string }> =>
+  writeMethod('benin_hr.api.config.update_payroll_parameter', { parameter_key, parameter_value });
+
+/** Simulateur de séparation (lecture : préavis + indemnité + cas protégés). */
+export const previewSeparation = (employee: string, separation_type: string, reason = ''): Promise<any> =>
+  method('benin_hr.api.separation.preview_separation', { employee_name: employee, separation_type, reason });
+
+/** Génération d'une déclaration/état social à la demande (lecture). */
+export const generateDeclaration = (methodName: string, params: Record<string, string>): Promise<any> =>
+  method(`benin_hr.api.declarations.${methodName}`, params);
+
+// ---- Étape 3 : réquisitions d'embauche (demande → validation → création) ----
+const ONB = 'benin_hr.api.onboarding';
+
+export type OnboardingRequest = {
+  name: string; candidate_name: string; candidate_email?: string;
+  designation?: string; department?: string;
+  status: 'Demande' | 'Validee' | 'Creee' | 'Rejetee';
+  requested_by: string; validated_by?: string; created_employee?: string;
+  reason?: string; rejection_reason?: string; creation: string;
+};
+export type OnboardingContext = {
+  requests: OnboardingRequest[];
+  can_request: boolean; can_validate: boolean; can_create: boolean;
+  current_user: string;
+  genders: string[]; companies: string[]; default_company: string | null;
+};
+
+/** Contexte role-aware de l'écran de recrutement (liste scopée + drapeaux + méta). */
+export const getOnboardingRequests = (): Promise<OnboardingContext> =>
+  method(`${ONB}.get_onboarding_requests`);
+
+/** Le manager (ou HR/Directeur) initie une demande d'embauche. */
+export const createOnboardingRequest = (input: {
+  candidate_name: string; candidate_email?: string; designation?: string;
+  department?: string; reason?: string;
+}): Promise<{ name: string; status: string }> =>
+  writeMethod(`${ONB}.create_onboarding_request`, input);
+
+/** Le Directeur valide/refuse une demande (four-eyes : ≠ demandeur — gardé au back). */
+export const decideOnboardingRequest = (
+  name: string, approve: boolean, rejection_reason?: string,
+): Promise<{ name: string; status: string }> =>
+  writeMethod(`${ONB}.validate_onboarding_request`, { name, approve, rejection_reason });
+
+/** Le gestionnaire RH crée le dossier depuis une demande validée (≠ validateur — gardé au back). */
+export const createEmployeeFromRequest = (input: {
+  name: string; person_id: string; gender: string; date_of_birth: string;
+  date_of_joining?: string; company?: string;
+}): Promise<{ name: string; status: string; employee: string }> =>
+  writeMethod(`${ONB}.create_employee_from_request`, input);
+
+// ---- Étape 4 : gouvernance des accès privilégiés (journal + revue, G4) ----
+const AG = 'benin_hr.api.access_governance';
+
+export type AccessEvent = {
+  name: string; user: string; action: string;
+  reference_doctype?: string; reference_name?: string;
+  role_context?: string; ip_address?: string; creation: string;
+};
+export type AccessHolder = {
+  user: string; full_name: string; roles: string[];
+  enabled: boolean; last_active?: string; last_login?: string;
+};
+export type AccessReviewContext = {
+  holders: AccessHolder[]; holder_count: number;
+  last_review: { name: string; reviewed_by: string; review_date: string; holder_count: number } | null;
+  last_review_age_days: number | null; overdue: boolean;
+  review_interval_days: number; sensitive_roles: string[];
+};
+
+/** Journal des accès privilégiés récents (oversight : Admin SI / Direction). */
+export const getAccessAudit = (): Promise<{ events: AccessEvent[]; audited_role: string }> =>
+  method(`${AG}.get_access_audit`);
+
+/** Contexte de revue : détenteurs de rôles sensibles + état de la dernière revue. */
+export const getAccessReview = (): Promise<AccessReviewContext> =>
+  method(`${AG}.get_access_review`);
+
+/** Atteste qu'une revue des accès a eu lieu (ISO 8.2 — POST + CSRF). */
+export const recordAccessReview = (notes?: string): Promise<{ name: string; review_date: string; holder_count: number }> =>
+  writeMethod(`${AG}.record_access_review`, { notes });
 
 const initials = (s: string) =>
   (s || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
@@ -141,9 +288,10 @@ export const frappeSource: RhDataSource = {
   // BACK-GAP : évaluations = `teaching_eval`, pas benin_hr.
   getEvaluations: async (): Promise<RhEvaluation[]> => [],
 
-  // BACK-GAP : pas de doctype/liste de séparations (separation.py = fonctions sans
-  // whitelist : initiate/finalize/calculate). TODO back : exposer une liste des
-  // séparations en cours (ou dériver des Employee status=Left + contrat Resilie).
+  // Pas de doctype/historique de séparations persistées (separation.py ne persiste rien).
+  // F1 a exposé `separation.preview_separation(employee, type, reason)` (whitelisté, RH) :
+  // l'écran RH devient un SIMULATEUR (préavis + indemnité + cas protégés, lecture seule)
+  // câblé en F3 via une méthode dédiée. La liste d'historique reste sans source (vide).
   getSeparations: async (): Promise<Separation[]> => [],
 
   // BACK-GAP : pas de modèles de documents côté benin_hr.

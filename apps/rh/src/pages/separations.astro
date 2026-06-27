@@ -1,8 +1,9 @@
 ---
 import Layout from '../layouts/RhLayout.astro';
-import { getSeparations, SEPARATION_KIND, separationBadge, separationSteps } from '@emela/shared/rh-data';
+import { getSeparations, getDirectory, SEPARATION_KIND, separationBadge, separationSteps } from '@emela/shared/rh-data';
 
 const separations = await getSeparations();
+const directory = await getDirectory();
 const enCours = separations.filter((s) => s.stage !== 'cloturee').length;
 const protege = separations.filter((s) => s.protected && s.stage === 'autorisation').length;
 const aFinaliser = separations.filter((s) => s.stage === 'finalisation').length;
@@ -94,15 +95,57 @@ const initials = (n: string) => n.split(' ').map((w) => w[0]).join('').slice(0, 
     <button class="em-btn em-btn--ghost em-btn--icon-only" data-drawer-close aria-label="Fermer"><svg class="ico"><use href="#i-x"/></svg></button>
   </div>
   <div class="rh-drawer-body">
-    <div class="em-field"><label class="em-field-label">Salarié</label><select class="em-select"><option>Rechercher un salarié…</option></select></div>
-    <div class="em-field"><label class="em-field-label">Motif de séparation</label><select class="em-select"><option>Démission</option><option>Fin de CDD</option><option>Licenciement</option><option>Départ à la retraite</option><option>Rupture conventionnelle</option></select></div>
+    <div class="em-field"><label class="em-field-label">Salarié</label><select class="em-select" id="sep-emp"><option value="">Rechercher un salarié…</option>{directory.map((e) => (<option value={e.id}>{e.employeeName} — {e.id}</option>))}</select></div>
+    <div class="em-field"><label class="em-field-label">Motif de séparation</label><select class="em-select" id="sep-type"><option value="demission">Démission</option><option value="fin_contrat">Fin de CDD</option><option value="licenciement">Licenciement</option><option value="retraite">Départ à la retraite</option><option value="rupture">Rupture conventionnelle</option></select></div>
     <div class="em-field"><label class="em-field-label">Date d'effet</label><input class="em-input" type="date" value="2026-07-31" /></div>
     <div class="em-alert em-alert--warning"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Un contrôle de <b>cas protégé</b> est exécuté à l'initiation. Si le salarié est protégé, la finalisation sera bloquée jusqu'à autorisation.</span></div></div>
+    <div id="sep-result" hidden></div>
   </div>
   <div class="rh-drawer-foot">
     <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
-    <button class="em-btn em-btn--primary" onclick="RhDrawer.close(); rhToast('Séparation initiée', true);">Initier</button>
+    <button class="em-btn em-btn--primary" id="sep-run"><svg class="ico-sm"><use href="#i-play"/></svg>Simuler</button>
   </div>
 </aside>
+
+<script is:inline>
+  // Simulateur de séparation : POST /api/separations/preview (lecture, gate RH back).
+  (function () {
+    var run = document.getElementById('sep-run');
+    if (!run) return;
+    var fcfa = function (n) { return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' F'; };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+    run.addEventListener('click', async function () {
+      var emp = document.getElementById('sep-emp').value;
+      var type = document.getElementById('sep-type').value;
+      var box = document.getElementById('sep-result');
+      if (!emp) { rhToast('Sélectionnez un salarié', false); return; }
+      run.disabled = true;
+      try {
+        var res = await fetch('/api/separations/preview', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee: emp, separation_type: type }),
+        });
+        var d = await res.json();
+        if (!res.ok) { rhToast(d.error || 'Échec de la simulation', false); run.disabled = false; return; }
+        var html;
+        if (d.status === 'blocked') {
+          var reasons = (d.blocking_reasons || []).map(function (r) { return '<li>' + esc(r.message || r.reason || r) + '</li>'; }).join('');
+          html = '<div class="em-alert em-alert--error" style="margin-top:var(--space-4)"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><div class="em-alert-title">Cas protégé — finalisation bloquée</div><ul class="em-alert-text" style="margin:var(--space-2) 0 0;padding-left:var(--space-5)">' + reasons + '</ul></div></div>';
+        } else {
+          var sev = d.severance_estimate && typeof d.severance_estimate === 'object' ? d.severance_estimate.severance : d.severance_estimate;
+          var alerts = (d.alerts || []).map(function (a) { return '<li>' + esc(a.message || a) + '</li>'; }).join('');
+          html = '<div class="em-alert em-alert--info" style="margin-top:var(--space-4)"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-shieldcheck"/></svg></span><div class="em-alert-body"><div class="em-alert-title">Simulation — préavis &amp; indemnité</div>'
+            + '<div class="em-alert-text"><div>Préavis : <b>' + (d.notice_period_days != null ? esc(d.notice_period_days) + ' jour(s)' : '—') + '</b></div>'
+            + '<div>Indemnité estimée : <b>' + fcfa(sev) + '</b></div>'
+            + (alerts ? '<ul style="margin:var(--space-2) 0 0;padding-left:var(--space-5)">' + alerts + '</ul>' : '')
+            + '</div></div></div>';
+        }
+        box.innerHTML = html;
+        box.hidden = false;
+      } catch (e) { rhToast('Erreur réseau', false); }
+      finally { run.disabled = false; }
+    });
+  })();
+</script>
 
 </Layout>

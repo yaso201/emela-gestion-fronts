@@ -55,8 +55,11 @@
     setTimeout(function () { t.style.transition = 'opacity .3s, transform .3s'; t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(function () { t.remove(); }, 320); }, 2600);
   };
 
-  // Déconnexion : branchez votre flux d'auth ici (POST /logout → /connexion).
-  window.hrLogout = window.hrLogout || function () { hrToast('Déconnexion…'); };
+  // Déconnexion : POST /api/logout (efface la session) puis /connexion.
+  window.hrLogout = function () {
+    hrToast('Déconnexion…');
+    fetch('/api/logout', { method: 'POST' }).finally(function () { window.location.href = '/connexion'; });
+  };
 
   function setMenu(open) {
     document.body.classList.toggle('nav-open', open);

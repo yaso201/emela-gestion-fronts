@@ -1,0 +1,257 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import Drawer from '../components/Drawer.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getOnboardingRequests } from '@emela/shared/rh-data';
+import type { OnboardingContext } from '@emela/shared/rh-data';
+
+let ctx: OnboardingContext = {
+  requests: [], can_request: false, can_validate: false, can_create: false,
+  current_user: '', genders: [], companies: [], default_company: null,
+};
+let fetchError = false;
+try {
+  ctx = await getOnboardingRequests();
+} catch {
+  fetchError = true;
+}
+
+const STATUS: Record<string, { variant: string; label: string }> = {
+  Demande: { variant: 'warning', label: 'En attente de validation' },
+  Validee: { variant: 'info', label: 'Validée — à créer' },
+  Creee: { variant: 'success', label: 'Dossier créé' },
+  Rejetee: { variant: 'error', label: 'Refusée' },
+};
+const me = ctx.current_user;
+---
+<Layout title="Recrutement — emela RH" page="recrutement">
+<style is:global>
+  .ob-row { display:flex; align-items:flex-start; gap:var(--space-4); padding:var(--space-5) var(--space-6); border-top:1px solid var(--border-subtle); }
+  .ob-row:first-child { border-top:0; }
+  .ob-ic { width:34px; height:34px; border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; background:var(--ink-50); color:var(--ink-700); flex-shrink:0; }
+  .ob-main { flex:1; min-width:0; }
+  .ob-main .t { font-size:var(--text-sm); font-weight:600; }
+  .ob-main .m { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:2px; }
+  .ob-side { display:flex; flex-direction:column; align-items:flex-end; gap:var(--space-3); flex-shrink:0; }
+  .ob-act { display:flex; gap:var(--space-3); }
+  .ob-hint { font-size:var(--text-xs); color:var(--text-tertiary); font-style:italic; }
+  .ob-form { display:flex; flex-direction:column; gap:var(--space-5); padding:var(--space-7); }
+  .ob-actions { display:flex; justify-content:flex-end; }
+  .em-field-label-opt { font-weight:400; color:var(--text-tertiary); }
+</style>
+<main class="hr-page">
+  <PageHead title="Recrutement" sub="Réquisition d'embauche : le manager demande, la direction valide, les RH créent le dossier (séparation des tâches)." />
+
+  {fetchError ? (
+    <Card>
+      <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+        <Icon name="i-warning" cls="ico-lg" />
+        <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Impossible de charger les demandes pour le moment. Réessayez plus tard.</p>
+      </div>
+    </Card>
+  ) : (
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      {ctx.can_request && (
+        <Card title="Nouvelle demande d'embauche" icon="i-target">
+          <div class="ob-form">
+            <div class="em-field">
+              <label class="em-field-label" for="ob-cand">Nom du candidat</label>
+              <input class="em-input" id="ob-cand" placeholder="ex. Awa Koudjo" />
+            </div>
+            <div class="em-field">
+              <label class="em-field-label" for="ob-mail">E-mail du candidat <span class="em-field-label-opt">(optionnel)</span></label>
+              <input class="em-input" id="ob-mail" type="email" placeholder="prenom.nom@x.bj" />
+            </div>
+            <div class="em-field">
+              <label class="em-field-label" for="ob-desig">Poste proposé <span class="em-field-label-opt">(optionnel)</span></label>
+              <input class="em-input" id="ob-desig" placeholder="ex. Comptable" />
+            </div>
+            <div class="em-field">
+              <label class="em-field-label" for="ob-dept">Département / équipe <span class="em-field-label-opt">(optionnel)</span></label>
+              <input class="em-input" id="ob-dept" placeholder="ex. Finance" />
+            </div>
+            <div class="em-field">
+              <label class="em-field-label" for="ob-reason">Justification du besoin <span class="em-field-label-opt">(optionnel)</span></label>
+              <textarea class="em-input" id="ob-reason" rows="2" placeholder="Remplacement, création de poste…"></textarea>
+            </div>
+            <div class="em-alert em-alert--info">
+              <span class="em-alert-icon"><Icon name="i-lock" cls="ico-sm" /></span>
+              <div class="em-alert-body"><span class="em-alert-text">Votre demande devra être validée par la direction puis transformée en dossier par les RH. Vous ne pouvez pas valider votre propre demande.</span></div>
+            </div>
+            <div class="ob-actions">
+              <button class="em-btn em-btn--primary" id="ob-submit"><Icon name="i-plus" cls="ico-sm" />Soumettre la demande</button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Card title={`Demandes (${ctx.requests.length})`} icon="i-list">
+        {ctx.requests.length === 0 ? (
+          <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+            <Icon name="i-target" cls="ico-lg" />
+            <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Aucune demande d'embauche pour le moment.</p>
+          </div>
+        ) : ctx.requests.map((r) => {
+          const st = STATUS[r.status] ?? { variant: 'neutral', label: r.status };
+          const isOwner = r.requested_by === me;
+          const validatedByMe = r.validated_by === me;
+          return (
+            <div class="ob-row">
+              <span class="ob-ic"><Icon name="i-target" cls="ico-sm" /></span>
+              <div class="ob-main">
+                <div class="t">{r.candidate_name}{r.designation ? ` — ${r.designation}` : ''}</div>
+                <div class="m">
+                  {r.department ? `${r.department} · ` : ''}demandé par {r.requested_by}
+                  {r.status === 'Rejetee' && r.rejection_reason ? ` · motif : ${r.rejection_reason}` : ''}
+                  {r.status === 'Creee' && r.created_employee ? ` · dossier ${r.created_employee}` : ''}
+                </div>
+              </div>
+              <div class="ob-side">
+                <StatusBadge variant={st.variant} sm>{st.label}</StatusBadge>
+                {r.status === 'Demande' && (
+                  ctx.can_validate && !isOwner ? (
+                    <div class="ob-act">
+                      <button class="em-btn em-btn--secondary em-btn--sm" data-open-reject data-name={r.name}>Refuser</button>
+                      <button class="em-btn em-btn--primary em-btn--sm" data-validate data-name={r.name}>Valider</button>
+                    </div>
+                  ) : (
+                    <span class="ob-hint">{isOwner ? 'Vous avez initié cette demande' : 'En attente de la direction'}</span>
+                  )
+                )}
+                {r.status === 'Validee' && (
+                  ctx.can_create && !validatedByMe ? (
+                    <div class="ob-act">
+                      <button class="em-btn em-btn--primary em-btn--sm" data-open-create data-name={r.name} data-candidate={r.candidate_name}>Créer le dossier</button>
+                    </div>
+                  ) : (
+                    <span class="ob-hint">{validatedByMe ? 'Vous l’avez validée — un autre gestionnaire crée' : 'En attente de création RH'}</span>
+                  )
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  )}
+</main>
+
+{/* Drawer — création du dossier salarié (RH) */}
+<Drawer id="drawer-create" title="Créer le dossier salarié" sub="Depuis une demande validée. Le créateur ne peut pas être le validateur.">
+  <div class="em-field"><label class="em-field-label">Candidat</label><input class="em-input" id="cr-candidate" readonly /></div>
+  <input type="hidden" id="cr-name" />
+  <div class="em-field">
+    <label class="em-field-label" for="cr-person">Matricule (identifiant personne)</label>
+    <input class="em-input" id="cr-person" placeholder="PERS-90001" />
+    <span class="em-field-help">Identifiant unique du dossier (custom person id).</span>
+  </div>
+  <div class="em-field">
+    <label class="em-field-label" for="cr-gender">Genre</label>
+    <select class="em-select" id="cr-gender">
+      <option value="">Sélectionner…</option>
+      {ctx.genders.map((g) => (<option value={g}>{g}</option>))}
+    </select>
+  </div>
+  <div class="em-field"><label class="em-field-label" for="cr-dob">Date de naissance</label><input class="em-input" id="cr-dob" type="date" /></div>
+  <div class="em-field"><label class="em-field-label" for="cr-doj">Date d'embauche <span class="em-field-label-opt">(défaut : aujourd'hui)</span></label><input class="em-input" id="cr-doj" type="date" /></div>
+  <div class="em-field">
+    <label class="em-field-label" for="cr-company">Société</label>
+    <select class="em-select" id="cr-company">
+      {ctx.companies.map((c) => (<option value={c} selected={c === ctx.default_company}>{c}</option>))}
+    </select>
+  </div>
+  <div slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" id="cr-submit"><Icon name="i-check" cls="ico-sm" />Créer le dossier</button>
+  </div>
+</Drawer>
+
+{/* Drawer — refus d'une demande (Directeur) */}
+<Drawer id="drawer-reject" title="Refuser la demande" sub="Indiquez le motif du refus (transmis au demandeur).">
+  <input type="hidden" id="rj-name" />
+  <div class="em-field">
+    <label class="em-field-label" for="rj-reason">Motif du refus</label>
+    <textarea class="em-input" id="rj-reason" rows="3" placeholder="Poste non budgété, profil non retenu…"></textarea>
+  </div>
+  <div slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" id="rj-submit"><Icon name="i-x" cls="ico-sm" />Confirmer le refus</button>
+  </div>
+</Drawer>
+
+<script is:inline>
+  (function () {
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    var reload = function () { setTimeout(function () { location.reload(); }, 700); };
+
+    async function post(url, body, okMsg, btn) {
+      if (btn) btn.disabled = true;
+      try {
+        var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) { rhToast(okMsg, true); reload(); return true; }
+        rhToast(data.error || 'Échec de l’opération', false);
+      } catch (e) { rhToast('Erreur réseau', false); }
+      finally { if (btn) btn.disabled = false; }
+      return false;
+    }
+
+    // --- Nouvelle demande ---
+    var sub = document.getElementById('ob-submit');
+    if (sub) sub.addEventListener('click', function () {
+      var name = v('ob-cand');
+      if (!name) { rhToast('Le nom du candidat est requis.', false); return; }
+      post('/api/recrutement/demande', {
+        candidate_name: name, candidate_email: v('ob-mail') || undefined,
+        designation: v('ob-desig') || undefined, department: v('ob-dept') || undefined,
+        reason: v('ob-reason') || undefined,
+      }, 'Demande soumise', sub);
+    });
+
+    // --- Validation directe ---
+    document.querySelectorAll('[data-validate]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        post('/api/recrutement/validation', { name: b.getAttribute('data-name'), approve: true }, 'Demande validée', b);
+      });
+    });
+
+    // --- Refus (drawer) ---
+    document.querySelectorAll('[data-open-reject]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.getElementById('rj-name').value = b.getAttribute('data-name');
+        document.getElementById('rj-reason').value = '';
+        window.RhDrawer.open('drawer-reject');
+      });
+    });
+    var rj = document.getElementById('rj-submit');
+    if (rj) rj.addEventListener('click', function () {
+      post('/api/recrutement/validation', {
+        name: document.getElementById('rj-name').value, approve: false, rejection_reason: v('rj-reason') || undefined,
+      }, 'Demande refusée', rj);
+    });
+
+    // --- Création (drawer) ---
+    document.querySelectorAll('[data-open-create]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.getElementById('cr-name').value = b.getAttribute('data-name');
+        document.getElementById('cr-candidate').value = b.getAttribute('data-candidate') || '';
+        document.getElementById('cr-person').value = '';
+        document.getElementById('cr-dob').value = '';
+        window.RhDrawer.open('drawer-create');
+      });
+    });
+    var cr = document.getElementById('cr-submit');
+    if (cr) cr.addEventListener('click', function () {
+      var person = v('cr-person'), gender = v('cr-gender'), dob = v('cr-dob');
+      if (!person || !gender || !dob) { rhToast('Matricule, genre et date de naissance requis.', false); return; }
+      post('/api/recrutement/creation', {
+        name: document.getElementById('cr-name').value, person_id: person, gender: gender,
+        date_of_birth: dob, date_of_joining: v('cr-doj') || undefined, company: v('cr-company') || undefined,
+      }, 'Dossier salarié créé', cr);
+    });
+  })();
+</script>
+</Layout>

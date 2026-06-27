@@ -49,10 +49,10 @@ const fmtVal = (p: typeof params[number]) => p.unit === '%' ? `${p.value} %` : (
       <div class="rh-grid-2">
         <div style="display:flex;flex-direction:column;gap:var(--space-6)">
           <div class="rh-card">
-            <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-shieldcheck"/></svg>Taux CNSS</span><button class="em-btn em-btn--ghost em-btn--sm" onclick="rhToast('Édition versionnée…')"><svg class="ico-sm"><use href="#i-pencil"/></svg>Modifier</button></div>
+            <div class="rh-card-head"><span class="rh-card-title"><svg class="ico-sm" style="color:var(--text-tertiary)"><use href="#i-shieldcheck"/></svg>Taux CNSS</span><button class="em-btn em-btn--ghost em-btn--sm" id="cnss-save"><svg class="ico-sm"><use href="#i-check"/></svg>Enregistrer</button></div>
             <div>
               {cnss.map((p) => (
-                <div class="param-row"><div class="lbl"><div class="t">{p.label}</div></div><span class="val">{fmtVal(p)}</span></div>
+                <div class="param-row"><div class="lbl"><div class="t">{p.label}</div></div><input class="em-input param-edit" data-key={p.key} value={p.value} /></div>
               ))}
               <div class="param-row"><div class="lbl"><div class="t">Plafond mensuel — branche pension</div></div><span class="val">1 000 000 F</span></div>
             </div>
@@ -133,6 +133,26 @@ const fmtVal = (p: typeof params[number]) => p.unit === '%' ? `${p.value} %` : (
     document.querySelectorAll('#ptabs .em-tab').forEach(function (t) { t.classList.toggle('is-active', t === b); });
     var pane = b.getAttribute('data-tab');
     document.querySelectorAll('.tabpane').forEach(function (p) { p.classList.toggle('is-active', p.getAttribute('data-pane') === pane); });
+  });
+
+  // Enregistrement des taux CNSS → POST /api/parametres (back gate Gestion-SM/admin).
+  var save = document.getElementById('cnss-save');
+  if (save) save.addEventListener('click', async function () {
+    var inputs = Array.prototype.slice.call(document.querySelectorAll('.param-edit'));
+    save.disabled = true;
+    try {
+      var n = 0;
+      for (var i = 0; i < inputs.length; i++) {
+        var res = await fetch('/api/parametres', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parameter_key: inputs[i].getAttribute('data-key'), parameter_value: inputs[i].value }),
+        });
+        if (!res.ok) { var d = await res.json().catch(function () { return {}; }); rhToast(d.error || 'Échec', false); save.disabled = false; return; }
+        n++;
+      }
+      rhToast(n + ' paramètre(s) enregistré(s)', true);
+    } catch (e) { rhToast('Erreur réseau', false); }
+    finally { save.disabled = false; }
   });
 </script>
 

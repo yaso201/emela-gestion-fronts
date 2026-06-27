@@ -61,6 +61,7 @@ const pending = requests.filter((r) => r.status === 'pending').length;
       <optgroup label="Finances">
         <option value="acompte">Acompte sur salaire</option>
         <option value="frais">Note de frais</option>
+        <option value="heures">Heures supplémentaires</option>
       </optgroup>
       <optgroup label="Attestations">
         <option value="att-travail">Attestation de travail</option>
@@ -70,6 +71,39 @@ const pending = requests.filter((r) => r.status === 'pending').length;
     </select>
   </div>
   <div class="em-alert em-alert--info" id="dd-att-note" hidden><span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span><div class="em-alert-body"><span class="em-alert-text">Demande adressée au service RH — délai indicatif <b>48 h ouvrées</b>. Le document signé sera disponible dans <a href="/documents" style="color:var(--ink-700);font-weight:600">Mes documents</a>.</span></div></div>
+  <div class="em-field" id="dd-cat-field" hidden>
+    <label class="em-field-label" for="dd-cat">Catégorie</label>
+    <select class="em-select" id="dd-cat">
+      <option>Transport</option><option>Mission</option><option>Repas</option>
+      <option>Hebergement</option><option>Fournitures</option><option>Autre</option>
+    </select>
+  </div>
+  <div id="dd-period-field" hidden style="display:grid;grid-template-columns:2fr 1fr;gap:var(--space-5)">
+    <div class="em-field"><label class="em-field-label" for="dd-pmonth">Mois</label>
+      <select class="em-select" id="dd-pmonth">
+        <option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option>
+        <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
+        <option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option>
+        <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option>
+      </select>
+    </div>
+    <div class="em-field"><label class="em-field-label" for="dd-pyear">Année</label><input class="em-input" id="dd-pyear" inputmode="numeric" value="2026" /></div>
+  </div>
+  <div id="dd-hours-field" hidden>
+    <label class="em-field-label" style="margin-bottom:var(--space-3)">Heures supplémentaires par majoration</label>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:var(--space-3) var(--space-5);align-items:center">
+      <span style="font-size:var(--text-sm)">41–48 h / semaine <span style="color:var(--text-tertiary)">(+12 %)</span></span>
+      <input class="em-input" id="dd-h-4148" inputmode="numeric" placeholder="0" style="max-width:90px" />
+      <span style="font-size:var(--text-sm)">Au-delà de 48 h <span style="color:var(--text-tertiary)">(+35 %)</span></span>
+      <input class="em-input" id="dd-h-beyond" inputmode="numeric" placeholder="0" style="max-width:90px" />
+      <span style="font-size:var(--text-sm)">Nuit, jour ouvrable <span style="color:var(--text-tertiary)">(+50 %)</span></span>
+      <input class="em-input" id="dd-h-nightwd" inputmode="numeric" placeholder="0" style="max-width:90px" />
+      <span style="font-size:var(--text-sm)">Jour, dimanche/férié <span style="color:var(--text-tertiary)">(+50 %)</span></span>
+      <input class="em-input" id="dd-h-daysh" inputmode="numeric" placeholder="0" style="max-width:90px" />
+      <span style="font-size:var(--text-sm)">Nuit, dimanche/férié <span style="color:var(--text-tertiary)">(+100 %)</span></span>
+      <input class="em-input" id="dd-h-nightsh" inputmode="numeric" placeholder="0" style="max-width:90px" />
+    </div>
+  </div>
   <div class="em-field" id="dd-amt-field"><label class="em-field-label" for="dd-amt">Montant (FCFA)</label><input class="em-input" id="dd-amt" inputmode="numeric" placeholder="ex. 150 000" /></div>
   <div class="em-field"><label class="em-field-label" for="dd-obj">Objet / justification</label><textarea class="em-textarea" id="dd-obj" placeholder="Précisez le motif de la demande…"></textarea></div>
   <div class="em-field" id="dd-justif-field">
@@ -78,7 +112,7 @@ const pending = requests.filter((r) => r.status === 'pending').length;
   </div>
   <Fragment slot="foot">
     <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
-    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande déposée', true);">Déposer la demande</button>
+    <button class="em-btn em-btn--primary" id="dd-submit">Déposer la demande</button>
   </Fragment>
 </Drawer>
 
@@ -89,14 +123,71 @@ const pending = requests.filter((r) => r.status === 'pending').length;
   var amt = document.getElementById('dd-amt-field');
   var justif = document.getElementById('dd-justif-field');
   var note = document.getElementById('dd-att-note');
+  var cat = document.getElementById('dd-cat-field');
+  var period = document.getElementById('dd-period-field');
+  var hours = document.getElementById('dd-hours-field');
+  function val(id){ var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
   function sync(){
-    var isAtt = sel.value.indexOf('att-') === 0;
-    amt.hidden = isAtt;
-    justif.hidden = isAtt;
+    var v = sel.value;
+    var isAtt = v.indexOf('att-') === 0, isHeures = v === 'heures', isFrais = v === 'frais';
+    amt.hidden = isAtt || isHeures;
+    justif.hidden = !isFrais;
     note.hidden = !isAtt;
+    cat.hidden = !isFrais;
+    period.hidden = !isHeures;
+    hours.hidden = !isHeures;
   }
   sel.addEventListener('change', sync);
   sync();
+
+  // Dépôt réel (write-path) : acompte / note de frais / heures sup → POST /api/requests/<type>.
+  // (Les attestations restent à brancher côté back ; congé = drawer dédié dans /conges.)
+  async function post(url, body){
+    var res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    return { ok: res.ok, data: await res.json().catch(function(){ return {}; }) };
+  }
+  function amount(){ return parseInt(val('dd-amt').replace(/[^0-9]/g,''), 10); }
+
+  var submit = document.getElementById('dd-submit');
+  if (submit) submit.addEventListener('click', async function () {
+    var v = sel.value, url, body;
+    if (v === 'acompte') {
+      var a = amount(); if (!a) { hrToast('Indiquez un montant.', false); return; }
+      var now = new Date(), nm = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      url = '/api/requests/acompte';
+      body = { amount: a, request_date: now.toISOString().slice(0,10),
+               repayment_month: String(nm.getMonth()+1).padStart(2,'0'), repayment_year: String(nm.getFullYear()),
+               reason: val('dd-obj') };
+    } else if (v === 'frais') {
+      var af = amount(); if (!af) { hrToast('Indiquez un montant.', false); return; }
+      url = '/api/requests/note-de-frais';
+      body = { category: val('dd-cat'), amount: af, expense_date: new Date().toISOString().slice(0,10),
+               description: val('dd-obj') };
+    } else if (v === 'heures') {
+      function hv(id){ return parseFloat((val(id) || '0').replace(',', '.')) || 0; }
+      var tranches = {
+        h_41_48: hv('dd-h-4148'), h_beyond_48: hv('dd-h-beyond'), night_weekday: hv('dd-h-nightwd'),
+        day_sunday_holiday: hv('dd-h-daysh'), night_sunday_holiday: hv('dd-h-nightsh'),
+      };
+      var totalH = Object.keys(tranches).reduce(function(s,k){ return s + tranches[k]; }, 0);
+      if (totalH <= 0) { hrToast('Indiquez au moins une heure.', false); return; }
+      url = '/api/requests/heures-sup';
+      body = Object.assign({ period_month: val('dd-pmonth'), period_year: val('dd-pyear'), reason: val('dd-obj') }, tranches);
+    } else if (v.indexOf('att-') === 0) {
+      var ATT = { 'att-travail': 'Travail', 'att-assiduite': 'Assiduite', 'att-mission': 'Mission enseignement' };
+      url = '/api/requests/attestation';
+      body = { attestation_type: ATT[v], reason: val('dd-obj') };
+    } else {
+      HrDrawer.close(); hrToast('Demande déposée', true); return;
+    }
+    submit.disabled = true;
+    try {
+      var r = await post(url, body);
+      if (r.ok) { HrDrawer.close(); hrToast('Demande déposée', true); setTimeout(function(){ location.reload(); }, 700); }
+      else { hrToast(r.data.error || 'Échec du dépôt', false); }
+    } catch (e) { hrToast('Erreur réseau', false); }
+    finally { submit.disabled = false; }
+  });
 })();
 </script>
 

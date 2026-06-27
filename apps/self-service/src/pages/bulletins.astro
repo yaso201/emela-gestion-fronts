@@ -67,7 +67,7 @@ const PS: Record<string, { v: string; l: string }> = {
             <td><b>{p.period}</b></td><td>{p.issuedOn}</td>
             <td class="em-cell-num num">{fcfa(p.gross)}</td><td class="em-cell-num num">{fcfa(p.deductions)}</td><td class="em-cell-num num"><b>{fcfa(p.net)}</b></td>
             <td><StatusBadge variant={PS[p.status].v}>{PS[p.status].l}</StatusBadge></td>
-            <td style="text-align:right;white-space:nowrap"><a class="em-btn em-btn--secondary em-btn--sm" href={`/bulletin?id=${p.id}`}>Voir</a> <button class="em-btn em-btn--ghost em-btn--sm" onclick="hrToast('Téléchargement du PDF…')"><Icon name="i-download" cls="ico-sm" />PDF</button></td>
+            <td style="text-align:right;white-space:nowrap"><a class="em-btn em-btn--secondary em-btn--sm" href={`/bulletin?id=${p.id}`}>Voir</a> <button class="em-btn em-btn--ghost em-btn--sm" onclick={`downloadBulletin(${JSON.stringify(p.id)})`}><Icon name="i-download" cls="ico-sm" />PDF</button></td>
           </tr>
         ))}
       </tbody>
@@ -75,5 +75,25 @@ const PS: Record<string, { v: string; l: string }> = {
   </div>
   <p style="font-size:var(--text-xs);color:var(--text-tertiary);margin-top:var(--space-5)">Le bulletin de décembre intègre la prime de fin d'année (13<sup>e</sup> mois conventionnel).</p>
 </main>
+
+<script is:inline>
+  // Téléchargement du bulletin via le proxy /api/bulletin/pdf (permission self-scope back).
+  window._dlBusy = window._dlBusy || {};
+  window.downloadBulletin = async function (id) {
+    if (window._dlBusy[id]) return;       // garde double-clic
+    window._dlBusy[id] = true;
+    try {
+      var res = await fetch('/api/bulletin/pdf?id=' + encodeURIComponent(id));
+      if (!res.ok) { var d = await res.json().catch(function () { return {}; }); hrToast(d.error || 'Téléchargement impossible', false); return; }
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'bulletin-' + id + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      hrToast('Bulletin téléchargé', true);
+    } catch (e) { hrToast('Erreur réseau', false); }
+    finally { window._dlBusy[id] = false; }
+  };
+</script>
 
 </Layout>

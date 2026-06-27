@@ -20,6 +20,7 @@ import type {
   DataSource, LeaveBalance, LeaveRequest, HrRequest, Payslip,
   Colleague, Notification, PayslipLine, HrDocument, PayslipDetail, Evaluation, CalendarEvent, Holiday,
 } from '../types';
+import { authHeaders } from '../session';
 
 const BASE = (import.meta as any).env?.PUBLIC_FRAPPE_URL ?? '';
 const COCKPIT = 'benin_hr.api.cockpit';
@@ -28,8 +29,7 @@ const COCKPIT = 'benin_hr.api.cockpit';
 async function method<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(`${BASE}/api/method/${path}${qs ? `?${qs}` : ''}`, {
-    headers: { Accept: 'application/json' },
-    credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeaders() },
   });
   if (!res.ok) throw new Error(`benin_hr ${path} → ${res.status}`);
   return (await res.json()).message as T;
@@ -46,7 +46,7 @@ async function resource<T = any[]>(
     ...(order_by ? { order_by } : {}),
   }).toString();
   const res = await fetch(`${BASE}/api/resource/${encodeURIComponent(doctype)}?${qs}`, {
-    headers: { Accept: 'application/json' }, credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeaders() },
   });
   if (!res.ok) throw new Error(`benin_hr ${doctype} → ${res.status}`);
   return ((await res.json()).data ?? []) as T;
@@ -55,11 +55,67 @@ async function resource<T = any[]>(
 /** Un document précis : /api/resource/<Doctype>/<name>. */
 async function doc<T = any>(doctype: string, name: string): Promise<T> {
   const res = await fetch(`${BASE}/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, {
-    headers: { Accept: 'application/json' }, credentials: 'include',
+    headers: { Accept: 'application/json', ...authHeaders() },
   });
   if (!res.ok) throw new Error(`benin_hr ${doctype}/${name} → ${res.status}`);
   return (await res.json()).data as T;
 }
+
+const SELF = 'benin_hr.api.self_requests';
+
+/** Écriture POST avec forward du jeton CSRF de la session (proxy SSR).
+ *  Le back protège ses écritures par CSRF ; on récupère le jeton de la session
+ *  courante puis on l'attache à la requête. L'`employee` n'est JAMAIS envoyé :
+ *  il est résolu côté serveur depuis la session. */
+async function writeMethod<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const csrf = (await method<{ csrf_token: string }>(`${COCKPIT}.get_csrf_token`))?.csrf_token;
+  const res = await fetch(`${BASE}/api/method/${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json',
+      'X-Frappe-CSRF-Token': csrf ?? '', ...authHeaders(),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`benin_hr ${path} → ${res.status}`);
+  return (await res.json()).message as T;
+}
+
+export type CreatedRequest = { name: string; status: string };
+
+/** Dépôt d'une demande d'acompte par le salarié connecté. */
+export const createAcompte = (input: {
+  amount: number; request_date: string; repayment_month: string; repayment_year: string; reason?: string;
+}): Promise<CreatedRequest> => writeMethod(`${SELF}.create_acompte`, input);
+
+/** Dépôt d'une note de frais. */
+export const createNoteDeFrais = (input: {
+  category: string; amount: number; expense_date: string; description?: string;
+}): Promise<CreatedRequest> => writeMethod(`${SELF}.create_note_de_frais`, input);
+
+/** Saisie d'heures supplémentaires. */
+export const createHeuresSup = (input: {
+  period_month: string; period_year: string;
+  h_41_48?: number; h_beyond_48?: number; night_weekday?: number;
+  day_sunday_holiday?: number; night_sunday_holiday?: number; reason?: string;
+}): Promise<CreatedRequest> => writeMethod(`${SELF}.create_heures_sup`, input);
+
+/** Dépôt d'une demande de congé. */
+export const createLeaveRequest = (input: {
+  leave_type: string; from_date: string; to_date: string; reason?: string;
+}): Promise<CreatedRequest> => writeMethod(`${SELF}.create_leave_request`, input);
+
+/** Demande d'attestation administrative (travail / assiduité / mission). */
+export const createAttestation = (input: {
+  attestation_type: string; reason?: string;
+}): Promise<CreatedRequest> => writeMethod(`${SELF}.create_attestation`, input);
+
+/** Attestations du salarié connecté (self-scope) — pour téléchargement. */
+export type MyAttestation = {
+  name: string; attestation_type: string; status: string; request_date?: string; has_document?: boolean;
+};
+export const getMyAttestations = (): Promise<MyAttestation[]> =>
+  method(`${SELF}.get_my_attestations`);
 
 const initials = (s: string) =>
   (s || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
@@ -129,25 +185,17 @@ export const frappeSource: DataSource = {
     return out;
   },
 
-  // Bulletins : Payroll Slip self (scopé) + période depuis le Payroll Run.
+  // Bulletins : méthode cockpit qui joint la période/statut du run côté serveur.
+  // (Le salarié ne peut PAS lire le doctype Payroll Run en REST → 403.)
   getPayslips: async () => {
-    const slips = await resource<any[]>('Payroll Slip',
-      ['name', 'payroll_run', 'gross_salary', 'its_amount', 'other_deductions', 'net_salary'], {}, 'creation desc');
-    const runIds = [...new Set(slips.map((s) => s.payroll_run).filter(Boolean))];
-    const runs = runIds.length
-      ? await resource<any[]>('Payroll Run', ['name', 'period_month', 'period_year', 'status'], { name: ['in', runIds] })
-      : [];
-    const byRun: Record<string, any> = Object.fromEntries(runs.map((r) => [r.name, r]));
-    return slips.map((s): Payslip => {
-      const r = byRun[s.payroll_run] ?? {};
-      return {
-        id: s.name, period: r.period_year ? `${r.period_month}/${r.period_year}` : '',
-        issuedOn: '', gross: s.gross_salary ?? 0, deductions: (s.its_amount ?? 0) + (s.other_deductions ?? 0),
-        incomeTax: s.its_amount ?? 0, net: s.net_salary ?? 0,
-        status: r.status === 'Generee' || r.status === 'Transmise ERPNext' ? 'available' : 'archived',
-        year: Number(r.period_year) || 0,
-      };
-    });
+    const slips = await method<any[]>(`${COCKPIT}.get_my_payslips`);
+    return (slips ?? []).map((s): Payslip => ({
+      id: s.id, period: s.period_year ? `${s.period_month}/${s.period_year}` : '',
+      issuedOn: '', gross: s.gross_salary ?? 0, deductions: (s.its_amount ?? 0) + (s.other_deductions ?? 0),
+      incomeTax: s.its_amount ?? 0, net: s.net_salary ?? 0,
+      status: s.run_status === 'Generee' || s.run_status === 'Transmise ERPNext' ? 'available' : 'archived',
+      year: Number(s.period_year) || 0,
+    }));
   },
 
   // Détail bulletin : document Payroll Slip + journal de calcul + rubriques (child
@@ -202,18 +250,19 @@ export const frappeSource: DataSource = {
     };
   },
 
+  // Jours fériés : référentiel via méthode cockpit (l'Employee n'a pas de read REST → 403).
   getHolidays: async () => {
-    const rows = await resource<any[]>('Public Holiday', ['holiday_name', 'holiday_date'], {}, 'holiday_date asc');
-    return rows.map((r): Holiday => ({ date: r.holiday_date, name: r.holiday_name }));
+    const rows = await method<any[]>(`${COCKPIT}.get_holidays`);
+    return (rows ?? []).map((r): Holiday => ({ date: r.holiday_date, name: r.holiday_name }));
   },
 
   getCalendarEvents: async () => {
     const [leaves, hols] = await Promise.all([
       resource<any[]>('Leave Application', ['from_date', 'to_date', 'leave_type', 'status'], {}, 'from_date asc'),
-      resource<any[]>('Public Holiday', ['holiday_name', 'holiday_date'], {}, 'holiday_date asc'),
+      method<any[]>(`${COCKPIT}.get_holidays`),
     ]);
     const ev: CalendarEvent[] = leaves.map((l) => ({ start: l.from_date, end: l.to_date, label: l.leave_type, kind: l.status === 'Approved' ? 'leave' : 'pending' }));
-    for (const h of hols) ev.push({ start: h.holiday_date, end: h.holiday_date, label: h.holiday_name, kind: 'hol' });
+    for (const h of (hols ?? [])) ev.push({ start: h.holiday_date, end: h.holiday_date, label: h.holiday_name, kind: 'hol' });
     return ev;
   },
 

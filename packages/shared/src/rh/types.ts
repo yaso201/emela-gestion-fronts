@@ -11,7 +11,7 @@
    ============================================================ */
 
 // ---- Profils (rôles) du back-office ----
-export type RoleId = 'manager' | 'gest_rh' | 'paie' | 'finance' | 'dir' | 'admin';
+export type RoleId = 'manager' | 'gest_rh' | 'paie' | 'finance' | 'dir' | 'admin' | 'gestion_sm';
 
 // ---- Annuaire du personnel (HRMS Employee) ----
 /** Statut d'un dossier salarié (HRMS Employee.status). */

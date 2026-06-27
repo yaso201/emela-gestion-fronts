@@ -2,12 +2,16 @@
 import Layout from '../layouts/RhLayout.astro';
 import { getKpis, getPayrollRuns, PAYROLL_STATUS, periodLabel } from '@emela/shared/rh-data';
 
-const kpis = await getKpis();
-const runs = await getPayrollRuns();
+// Récupérations gracieuses : un profil sans droit (ex. manager → KPI/paie 403)
+// ne doit PAS planter la page. Les blocs concernés sont déjà masqués par data-roles.
+let kpis: Awaited<ReturnType<typeof getKpis>> = [];
+let runs: Awaited<ReturnType<typeof getPayrollRuns>> = [];
+try { kpis = await getKpis(); } catch { /* pas d'accès KPI */ }
+try { runs = await getPayrollRuns(); } catch { /* pas d'accès paie */ }
 const headcount = kpis.find((k) => k.id === 'headcount')?.value ?? '—';
 const current = runs.find((r) => r.status !== 'Preparation') ?? runs[0];
-const curStatus = PAYROLL_STATUS[current.status];
-const curLabel = periodLabel(current.periodMonth, current.periodYear);
+const curStatus = current ? PAYROLL_STATUS[current.status] : undefined;
+const curLabel = current ? periodLabel(current.periodMonth, current.periodYear) : '—';
 ---
 <Layout title="Tableau de bord RH — emela" page="cockpit">
 <style is:global>
@@ -35,7 +39,7 @@ const curLabel = periodLabel(current.periodMonth, current.periodYear);
     <div class="em-kpi"><span class="em-kpi-label">Effectif actif</span><span class="em-kpi-value num">{headcount}</span><span class="em-kpi-meta">agents · +6 ce mois</span></div>
     <div class="em-kpi"><span class="em-kpi-label">Masse salariale (mai)</span><span class="em-kpi-value num">218,4<span class="em-kpi-value-unit">M F</span></span><span class="em-kpi-trend em-kpi-trend--up"><svg class="ico-sm"><use href="#i-trendup"/></svg>+2,1 % vs avril</span></div>
     <div class="em-kpi"><span class="em-kpi-label">Congés à valider</span><span class="em-kpi-value num">7</span><span class="em-kpi-meta">dont 2 &gt; 5 jours</span></div>
-    <div class="em-kpi"><span class="em-kpi-label">Cycle de paie</span><span class="em-kpi-value" style="font-size:20px;line-height:1.3">{curLabel}</span><span class="em-kpi-meta"><span class:list={["em-badge", `em-badge--${curStatus.variant}`, "em-badge--sm"]}><span class="em-badge-dot"></span>{curStatus.label}</span></span></div>
+    <div class="em-kpi"><span class="em-kpi-label">Cycle de paie</span><span class="em-kpi-value" style="font-size:20px;line-height:1.3">{curLabel}</span><span class="em-kpi-meta">{curStatus ? (<span class:list={["em-badge", `em-badge--${curStatus.variant}`, "em-badge--sm"]}><span class="em-badge-dot"></span>{curStatus.label}</span>) : '—'}</span></div>
   </section>
 
   <!-- Vue Manager : Mon équipe -->

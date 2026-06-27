@@ -15,6 +15,10 @@ import type {
 import * as mock from './mock';
 import { frappeSource } from '../client/frappe';
 
+// ---- Validation RH : liste des demandes en attente + actions (POST + CSRF) ----
+export { getPendingValidations, decideAcompte, decideNoteDeFrais, decideHeuresSup, decideConge, decideAttestation, provisionUser, updatePayrollParameter, previewSeparation, generateDeclaration, getOnboardingRequests, createOnboardingRequest, decideOnboardingRequest, createEmployeeFromRequest, getAccessAudit, getAccessReview, recordAccessReview } from '../client/frappe';
+export type { DecisionResult, PendingValidations, PendingRow, OnboardingContext, OnboardingRequest, AccessEvent, AccessHolder, AccessReviewContext } from '../client/frappe';
+
 const mockSource: RhDataSource = {
   getKpis:               async () => mock.kpis,
   getDirectory:          async () => mock.directory,

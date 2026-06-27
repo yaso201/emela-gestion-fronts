@@ -6,64 +6,24 @@
    scroll-lock + inert), toasts (aria-live), format FCFA.
    ============================================================ */
 (function () {
-  var STORE = 'emela_rh_role';
-  var ROLES = ['manager', 'gest_rh', 'paie', 'finance', 'dir', 'admin'];
-
-  // Couleur + libellé + identité par rôle (miroir du SSR ; sert au runtime).
-  var ROLE_INFO = {
-    manager: { name: 'Sylvain Dossou',       role: 'Manager',          av: 'SD', c: 'var(--rh-manager)', soft: 'var(--rh-manager-soft)' },
-    gest_rh: { name: 'Rachelle Houngbé',     role: 'Gestionnaire RH',  av: 'RH', c: 'var(--rh-gest)',    soft: 'var(--rh-gest-soft)' },
-    paie:    { name: 'Bertin Aïkpé',         role: 'Responsable paie', av: 'BA', c: 'var(--rh-paie)',    soft: 'var(--rh-paie-soft)' },
-    finance: { name: 'Carine Zinsou',        role: 'Finance',          av: 'CZ', c: 'var(--rh-finance)', soft: 'var(--rh-finance-soft)' },
-    dir:     { name: 'Pr. Adjovi Mensah',    role: 'Direction',        av: 'AM', c: 'var(--rh-dir)',     soft: 'var(--rh-dir-soft)' },
-    admin:   { name: 'Service informatique', role: 'Admin technique',  av: 'SI', c: 'var(--rh-admin)',   soft: 'var(--rh-admin-soft)' },
-  };
-  var ROLE_HOME = { manager: '/cockpit', gest_rh: '/personnel', paie: '/paie', finance: '/validation', dir: '/cockpit', admin: '/parametres' };
-
-  function getRole() {
-    var r = null; try { r = localStorage.getItem(STORE); } catch (e) {}
-    if (ROLES.indexOf(r) < 0) r = document.body.getAttribute('data-role') || 'gest_rh';
-    return r;
+  // Profils RÉELS de l'utilisateur, posés en SSR par le middleware (data-profiles).
+  // Le nav est déjà filtré côté serveur ; ici on masque les blocs de CONTENU [data-roles]
+  // selon l'ENSEMBLE des profils de l'utilisateur (intersection).
+  function profiles() {
+    return (document.body.getAttribute('data-profiles') || '').split(/\s+/).filter(Boolean);
   }
-  function storeRole(r) { try { localStorage.setItem(STORE, r); } catch (e) {} }
-
-  function applyRole(role) {
-    document.body.setAttribute('data-role', role);
-    var info = ROLE_INFO[role];
-    var sel = document.getElementById('rh-role-sel'); if (sel) sel.value = role;
-    var dot = document.getElementById('rh-role-dot'); if (dot) dot.style.background = info.c;
-    var nm = document.querySelector('.nav-user .nm'); if (nm) nm.textContent = info.name;
-    var rl = document.querySelector('.nav-user .rl'); if (rl) { rl.textContent = info.role; rl.style.color = info.c; }
-    var av = document.querySelector('.nav-user .av'); if (av) { av.textContent = info.av; av.style.background = info.soft; av.style.color = info.c; }
-
-    // Filtre nav par rôle + masque les libellés de groupe sans enfant visible
-    document.querySelectorAll('.nav-item[data-roles]').forEach(function (a) {
-      a.hidden = a.getAttribute('data-roles').split(/\s+/).indexOf(role) < 0;
-    });
-    document.querySelectorAll('.nav-scroll .nav-grouplabel').forEach(function (lbl) {
-      var any = false, n = lbl.nextElementSibling;
-      while (n && n.classList.contains('nav-item')) { if (!n.hidden) any = true; n = n.nextElementSibling; }
-      lbl.hidden = !any;
-    });
-    // Gating de contenu par rôle
+  function applyContentGating() {
+    var p = profiles();
     document.querySelectorAll('[data-roles]:not(.nav-item)').forEach(function (el) {
-      el.hidden = el.getAttribute('data-roles').split(/\s+/).indexOf(role) < 0;
+      var roles = el.getAttribute('data-roles').split(/\s+/);
+      el.hidden = !roles.some(function (r) { return p.indexOf(r) >= 0; });
     });
-    if (typeof window.onRhRole === 'function') window.onRhRole(role, info);
-  }
-
-  function setRole(role, fromClick) {
-    storeRole(role);
-    if (fromClick) {
-      var nav = document.querySelector('.nav-item[data-page="' + document.body.getAttribute('data-page') + '"]');
-      var canSee = nav && nav.getAttribute('data-roles').split(/\s+/).indexOf(role) >= 0;
-      if (!canSee && ROLE_HOME[role]) { window.location.href = ROLE_HOME[role]; return; }
-    }
-    applyRole(role);
+    // Les pages adaptent leur libellé via onRhRole(profilPrincipal).
+    if (typeof window.onRhRole === 'function') window.onRhRole(p[0] || '', { profiles: p });
   }
 
   window.fcfa = function (n) { n = Math.round(Number(n) || 0); return n.toLocaleString('fr-FR').replace(/\u00a0/g, ' ') + ' F'; };
-  window.RhShell = { getRole: getRole, setRole: setRole, ROLE_INFO: ROLE_INFO };
+  window.RhShell = { profiles: profiles };
 
   // ---- Tiroirs (focus-trap + scroll-lock + inert) ----
   var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -108,9 +68,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    var sel = document.getElementById('rh-role-sel');
-    if (sel) sel.addEventListener('change', function (e) { setRole(e.target.value, true); });
-
     var toggle = document.querySelector('[data-nav-toggle]');
     if (toggle) { toggle.setAttribute('aria-expanded', 'false'); toggle.addEventListener('click', function () { setMenu(!document.body.classList.contains('nav-open')); }); }
     document.querySelectorAll('[data-nav-close]').forEach(function (el) { el.addEventListener('click', function () { setMenu(false); }); });
@@ -129,6 +86,6 @@
       }
     });
 
-    var role = getRole(); storeRole(role); applyRole(role);
+    applyContentGating();
   });
 })();

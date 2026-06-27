@@ -1,0 +1,84 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+
+// Provisioning contraint : la liste blanche réelle est imposée côté back
+// (Gestion-SM : Employee/HR User/Payroll User ; Director réservé à l'Admin SI).
+const ROLES = [
+  { value: 'Employee', label: 'Salarié (self-service)' },
+  { value: 'HR User', label: 'Gestionnaire RH' },
+  { value: 'Payroll User', label: 'Responsable paie' },
+];
+---
+<Layout title="Onboarding & accès — emela RH" page="onboarding">
+<main class="hr-page hr-page--narrow">
+  <PageHead title="Onboarding & accès" sub="Créer un compte et attribuer des rôles. Aucune donnée RH sensible n'est requise ; le mot de passe est défini par l'utilisateur via invitation." />
+
+  <Card title="Provisionner un compte" icon="i-users">
+    <div class="ob-form">
+      <div class="em-field">
+        <label class="em-field-label" for="ob-name">Nom complet</label>
+        <input class="em-input" id="ob-name" placeholder="ex. Awa Koudjo" />
+      </div>
+      <div class="em-field">
+        <label class="em-field-label" for="ob-email">E-mail (identifiant)</label>
+        <input class="em-input" id="ob-email" type="email" placeholder="prenom.nom@lanem.bj" />
+      </div>
+      <div class="em-field">
+        <label class="em-field-label" for="ob-emp">Matricule à relier <span class="em-field-label-opt">(optionnel — PERS-…)</span></label>
+        <input class="em-input" id="ob-emp" placeholder="PERS-90001" />
+        <span class="em-field-help">Le rôle « Salarié » est activé automatiquement quand un matricule est relié.</span>
+      </div>
+
+      <div class="em-field">
+        <label class="em-field-label">Rôles à attribuer</label>
+        <div class="ob-roles">
+          {ROLES.map((r) => (
+            <label class="em-check"><input type="checkbox" class="em-check-input ob-role" value={r.value} /><span>{r.label}</span></label>
+          ))}
+          <label class="em-check" data-roles="admin"><input type="checkbox" class="em-check-input ob-role" value="Director" /><span>Direction <span class="em-field-label-opt">(Admin SI uniquement)</span></span></label>
+        </div>
+      </div>
+
+      <div class="em-alert em-alert--info">
+        <span class="em-alert-icon"><Icon name="i-lock" cls="ico-sm" /></span>
+        <div class="em-alert-body"><span class="em-alert-text">Vous ne pouvez pas attribuer de rôle hors de votre périmètre ni à vous-même. Le compte est créé sans mot de passe ; l'utilisateur l'initialise par invitation.</span></div>
+      </div>
+
+      <div class="ob-actions">
+        <button class="em-btn em-btn--primary" id="ob-submit"><Icon name="i-plus" cls="ico-sm" />Provisionner le compte</button>
+      </div>
+    </div>
+  </Card>
+</main>
+
+<style>
+  .ob-form { display: flex; flex-direction: column; gap: var(--space-6); padding: var(--space-7); }
+  .ob-roles { display: flex; flex-direction: column; }
+  .ob-actions { display: flex; justify-content: flex-end; }
+  .em-field-label-opt { font-weight: 400; color: var(--text-tertiary); }
+</style>
+
+<script is:inline>
+  (function () {
+    var btn = document.getElementById('ob-submit');
+    if (!btn) return;
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    btn.addEventListener('click', async function () {
+      var roles = Array.prototype.slice.call(document.querySelectorAll('.ob-role:checked')).map(function (c) { return c.value; });
+      var body = { email: v('ob-email'), full_name: v('ob-name'), roles: roles, employee: v('ob-emp') || undefined };
+      if (!body.email || !body.full_name || roles.length === 0) { rhToast('Nom, e-mail et au moins un rôle requis.', false); return; }
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) { rhToast('Compte provisionné : ' + data.user, true); }
+        else { rhToast(data.error || 'Échec du provisioning', false); }
+      } catch (e) { rhToast('Erreur réseau', false); }
+      finally { btn.disabled = false; }
+    });
+  })();
+</script>
+</Layout>

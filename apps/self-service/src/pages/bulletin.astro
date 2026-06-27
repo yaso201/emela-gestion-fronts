@@ -4,7 +4,11 @@ import Icon from '../components/Icon.astro';
 import { getEmployee, getPayslipDetail } from '@emela/shared/data';
 
 const emp = await getEmployee();
-const slip = await getPayslipDetail(Astro.url.searchParams.get('id') ?? '');
+// `id` contrôlé par l'utilisateur : exiger un name plausible (sinon retour liste).
+// La confidentialité inter-salariés reste garantie par les permissions back.
+const slipId = (Astro.url.searchParams.get('id') ?? '').trim();
+if (!slipId || !/^[\w-]{3,140}$/.test(slipId)) return Astro.redirect('/bulletins');
+const slip = await getPayslipDetail(slipId);
 const nf = (n: number) => new Intl.NumberFormat('fr-FR').format(n);
 const cell = (v?: number | null) => (v == null ? '—' : nf(v));
 ---
@@ -67,8 +71,8 @@ const cell = (v?: number | null) => (v == null ? '—' : nf(v));
   <div class="hr-pagehead">
     <div><h1>Bulletin de paie — {slip.period}</h1><p>Période du <b>{slip.periodLabel}</b> · payé le {slip.issuedOn} · réf. <span class="num" style="font-size:var(--text-xs)">{slip.reference}</span></p></div>
     <div class="hr-pagehead-actions">
-      <button class="em-btn em-btn--secondary" onclick="hrToast('Impression…')"><Icon name="i-print" cls="ico-sm" />Imprimer</button>
-      <button class="em-btn em-btn--primary" onclick="hrToast('Téléchargement du PDF…')"><Icon name="i-download" cls="ico-sm" />Télécharger le PDF</button>
+      <button class="em-btn em-btn--secondary" onclick={`printBulletin(${JSON.stringify(slipId)})`}><Icon name="i-print" cls="ico-sm" />Imprimer</button>
+      <button class="em-btn em-btn--primary" onclick={`downloadBulletin(${JSON.stringify(slipId)})`}><Icon name="i-download" cls="ico-sm" />Télécharger le PDF</button>
     </div>
   </div>
 
@@ -155,5 +159,29 @@ const cell = (v?: number | null) => (v == null ? '—' : nf(v));
     </div>
   </details>
 </main>
+
+<script is:inline>
+  // Téléchargement / impression du bulletin via le proxy /api/bulletin/pdf
+  // (le back gate la permission self-scope ; le sid est forwardé serveur→serveur).
+  window._dlBusy = window._dlBusy || {};
+  window.downloadBulletin = async function (id) {
+    if (window._dlBusy[id]) return;       // garde double-clic
+    window._dlBusy[id] = true;
+    try {
+      var res = await fetch('/api/bulletin/pdf?id=' + encodeURIComponent(id));
+      if (!res.ok) { var d = await res.json().catch(function () { return {}; }); hrToast(d.error || 'Téléchargement impossible', false); return; }
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = 'bulletin-' + id + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      hrToast('Bulletin téléchargé', true);
+    } catch (e) { hrToast('Erreur réseau', false); }
+    finally { window._dlBusy[id] = false; }
+  };
+  window.printBulletin = function (id) {
+    window.open('/api/bulletin/pdf?id=' + encodeURIComponent(id) + '&inline=1', '_blank', 'noopener,noreferrer');
+  };
+</script>
 
 </Layout>

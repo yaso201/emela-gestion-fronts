@@ -52,6 +52,13 @@ export const getEvaluations = (): Promise<Evaluation[]> => source.getEvaluations
 export const getCalendarEvents = (): Promise<CalendarEvent[]> => source.getCalendarEvents();
 export const getHolidays = (): Promise<Holiday[]> => source.getHolidays();
 
+// ---- Écritures (write-path, POST + CSRF) — séparées de l'interface DataSource ----
+export {
+  createAcompte, createNoteDeFrais, createHeuresSup, createLeaveRequest, createAttestation,
+  getMyAttestations,
+} from '../client/frappe';
+export type { CreatedRequest, MyAttestation } from '../client/frappe';
+
 // ---- Tables de présentation (statut/catégorie → variante DS + libellé) ----
 export const REQUEST_STATUS: Record<RequestStatus, { variant: string; label: string }> = {
   pending:    { variant: 'warning', label: 'En attente' },

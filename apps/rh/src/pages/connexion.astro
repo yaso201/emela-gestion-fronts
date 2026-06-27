@@ -1,0 +1,45 @@
+---
+export const prerender = false;
+const error = Astro.url.searchParams.get('error');
+const msg = error === 'auth' ? 'Identifiants incorrects.'
+  : error === 'missing' ? 'Renseignez votre email et votre mot de passe.'
+  : null;
+---
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Connexion — Back-office RH & Paie</title>
+  <style>
+    :root { --ink:#1f2933; --accent:#2f6f4f; --line:#e3e8ee; --bg:#f5f7fa; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink);
+      display:flex; min-height:100vh; align-items:center; justify-content:center; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:32px;
+      width:100%; max-width:360px; box-shadow:0 4px 24px rgba(31,41,51,.06); }
+    h1 { font-size:1.25rem; margin:0 0 4px; }
+    p.sub { margin:0 0 20px; color:#677; font-size:.9rem; }
+    label { display:block; font-size:.82rem; font-weight:600; margin:14px 0 6px; }
+    input { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:1rem; }
+    button { width:100%; margin-top:22px; padding:11px; background:var(--accent); color:#fff;
+      border:0; border-radius:8px; font-size:1rem; font-weight:600; cursor:pointer; }
+    .err { margin-top:14px; background:#fdecec; color:#a12; border:1px solid #f5c2c2;
+      border-radius:8px; padding:10px 12px; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Back-office RH & Paie</h1>
+    <p class="sub">Connectez-vous avec votre compte gestionnaire.</p>
+    {msg && <div class="err" role="alert">{msg}</div>}
+    <form method="POST" action="/api/login">
+      <label for="usr">Email professionnel</label>
+      <input id="usr" name="usr" type="email" autocomplete="username" required autofocus />
+      <label for="pwd">Mot de passe</label>
+      <input id="pwd" name="pwd" type="password" autocomplete="current-password" required />
+      <button type="submit">Se connecter</button>
+    </form>
+  </main>
+</body>
+</html>

@@ -1,0 +1,135 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import PageHead from '../components/PageHead.astro';
+import Card from '../components/Card.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getAccessReview, getAccessAudit } from '@emela/shared/rh-data';
+import type { AccessReviewContext, AccessEvent } from '@emela/shared/rh-data';
+
+let review: AccessReviewContext | null = null;
+let events: AccessEvent[] = [];
+let fetchError = false;
+try {
+  review = await getAccessReview();
+  events = (await getAccessAudit()).events;
+} catch {
+  fetchError = true;
+}
+
+const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const ACTION_VARIANT: Record<string, string> = { View: 'info', List: 'neutral', Dashboard: 'accent', Export: 'warning' };
+---
+<Layout title="Audit des accès — emela RH" page="audit-acces">
+<style is:global>
+  .ag-banner { display:flex; align-items:center; gap:var(--space-5); padding:var(--space-6) var(--space-7); }
+  .ag-banner .grow { flex:1; min-width:0; }
+  .ag-banner .lbl { font-size:var(--text-xs); color:var(--text-tertiary); }
+  .ag-banner .val { font-size:var(--text-base); font-weight:700; margin-top:2px; }
+  .ag-roles { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+  .ag-review-form { display:flex; gap:var(--space-3); align-items:flex-end; padding:0 var(--space-7) var(--space-6); flex-wrap:wrap; }
+  .ag-review-form .em-field { flex:1; min-width:220px; margin:0; }
+</style>
+<main class="hr-page">
+  <PageHead title="Audit des accès" sub="Accès privilégiés journalisés et revus périodiquement (ISO 27001 A.8.2, NIST AC-6(2)). Le System Manager garde la vue totale, mais c'est une exception tracée." />
+
+  {fetchError || !review ? (
+    <Card>
+      <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+        <Icon name="i-warning" cls="ico-lg" />
+        <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Impossible de charger l'audit des accès pour le moment.</p>
+      </div>
+    </Card>
+  ) : (
+    <div style="display:flex;flex-direction:column;gap:var(--space-6)">
+      {/* --- Revue des accès --- */}
+      <Card title="Revue des accès privilégiés" icon="i-shieldcheck">
+        <div class="ag-banner">
+          <span class="hr-stat-ic" style={`width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${review.overdue ? 'var(--error-50,#fde8e8)' : 'var(--success-50,#e8f5ec)'}`}>
+            <Icon name={review.overdue ? 'i-warning' : 'i-shieldcheck'} cls="ico-lg" />
+          </span>
+          <div class="grow">
+            <div class="lbl">Dernière revue</div>
+            <div class="val">
+              {review.last_review ? `${fmtDate(review.last_review.review_date)} · par ${review.last_review.reviewed_by}` : 'Jamais effectuée'}
+              {review.last_review_age_days != null ? ` · il y a ${review.last_review_age_days} j` : ''}
+            </div>
+          </div>
+          {review.overdue
+            ? <StatusBadge variant="error">Revue requise (&gt; {review.review_interval_days} j)</StatusBadge>
+            : <StatusBadge variant="success">À jour</StatusBadge>}
+        </div>
+
+        <div class="ag-review-form">
+          <div class="em-field">
+            <label class="em-field-label" for="ar-notes">Observations <span style="font-weight:400;color:var(--text-tertiary)">(optionnel)</span></label>
+            <input class="em-input" id="ar-notes" placeholder="RAS / comptes à désactiver / écarts constatés…" />
+          </div>
+          <button class="em-btn em-btn--primary" id="ar-submit"><Icon name="i-check" cls="ico-sm" />Marquer la revue effectuée</button>
+        </div>
+
+        <div class="em-table-wrap">
+          <table class="em-table">
+            <thead><tr><th>Utilisateur</th><th>Rôles sensibles</th><th>Statut</th><th>Dernier accès</th></tr></thead>
+            <tbody>
+              {review.holders.map((h) => (
+                <tr>
+                  <td><b>{h.full_name}</b><div style="font-size:var(--text-xs);color:var(--text-tertiary)">{h.user}</div></td>
+                  <td><div class="ag-roles">{h.roles.map((r) => (<span class="em-badge em-badge--neutral em-badge--sm">{r}</span>))}</div></td>
+                  <td>{h.enabled ? <StatusBadge variant="success" sm>Actif</StatusBadge> : <StatusBadge variant="error" sm>Désactivé</StatusBadge>}</td>
+                  <td>{fmtDate(h.last_active)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* --- Journal des accès privilégiés --- */}
+      <Card title={`Journal des accès privilégiés (${events.length})`} icon="i-eye">
+        {events.length === 0 ? (
+          <div style="padding:var(--space-9) var(--space-7);text-align:center;color:var(--text-tertiary)">
+            <Icon name="i-eye" cls="ico-lg" />
+            <p style="margin-top:var(--space-3);font-size:var(--text-sm)">Aucun accès privilégié journalisé pour le moment.</p>
+          </div>
+        ) : (
+          <div class="em-table-wrap">
+            <table class="em-table">
+              <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Donnée</th></tr></thead>
+              <tbody>
+                {events.map((e) => (
+                  <tr>
+                    <td>{fmtDate(e.creation)}</td>
+                    <td>{e.user}</td>
+                    <td><StatusBadge variant={ACTION_VARIANT[e.action] ?? 'neutral'} sm>{e.action}</StatusBadge></td>
+                    <td>{e.reference_doctype ?? '—'}{e.reference_name ? ` · ${e.reference_name}` : ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  )}
+</main>
+
+<script is:inline>
+  (function () {
+    var btn = document.getElementById('ar-submit');
+    if (!btn) return;
+    btn.addEventListener('click', async function () {
+      var notes = (document.getElementById('ar-notes') || {}).value || '';
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/audit-acces/revue', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ notes: notes }),
+        });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) { rhToast('Revue des accès enregistrée', true); setTimeout(function () { location.reload(); }, 700); }
+        else { rhToast(data.error || 'Échec de l’enregistrement', false); btn.disabled = false; }
+      } catch (e) { rhToast('Erreur réseau', false); btn.disabled = false; }
+    });
+  })();
+</script>
+</Layout>

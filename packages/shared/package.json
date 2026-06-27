@@ -8,7 +8,8 @@
     "./types": "./src/types.ts",
     "./data": "./src/data/index.ts",
     "./rh-types": "./src/rh/types.ts",
-    "./rh-data": "./src/rh/data/index.ts"
+    "./rh-data": "./src/rh/data/index.ts",
+    "./session": "./src/session.ts"
   },
   "files": ["src"]
 }

@@ -3,6 +3,7 @@ import '@emela/design-system/index.css';
 import '../styles/shell.css';
 import Sprite from '../components/Sprite.astro';
 import Icon from '../components/Icon.astro';
+import { getProfiles, getFullName } from '@emela/shared/session';
 
 interface Props {
   title: string;
@@ -11,27 +12,32 @@ interface Props {
 }
 const { title, page = '' } = Astro.props;
 
-// Rôle par défaut (la persistance + le filtrage runtime sont gérés par shell.js).
-const DEFAULT_ROLE = 'gest_rh';
+// Profils RÉELS de l'utilisateur (dérivés des rôles back, posés par le middleware).
+const profiles = getProfiles();
+const canSee = (roles: string) => roles.split(/\s+/).some((r) => profiles.includes(r));
 
-const ROLES = [
-  { id: 'manager', label: 'Manager' },
-  { id: 'gest_rh', label: 'Gestionnaire RH' },
-  { id: 'paie', label: 'Responsable paie' },
-  { id: 'finance', label: 'Finance' },
-  { id: 'dir', label: 'Direction' },
-  { id: 'admin', label: 'Admin technique' },
-];
+const PROFILE_LABELS: Record<string, string> = {
+  manager: 'Manager', gest_rh: 'Gestionnaire RH', paie: 'Responsable paie',
+  finance: 'Finance', dir: 'Direction', admin: 'Admin technique', gestion_sm: 'Gestion système',
+};
+const fullName = getFullName();
+// Libellé = profil le plus privilégié (pas le premier de la liste).
+const PROFILE_PRIORITY = ['admin', 'dir', 'gestion_sm', 'finance', 'paie', 'gest_rh', 'manager'];
+const primary = PROFILE_PRIORITY.find((p) => profiles.includes(p)) ?? '';
+const profileLabel = primary ? PROFILE_LABELS[primary] ?? '' : '';
+const initials = (fullName || 'RH').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || 'RH';
 
-// Navigation groupée — chaque item porte ses rôles autorisés (filtrés par shell.js).
+// Navigation groupée — chaque item porte ses profils autorisés.
 const NAV = [
   { group: 'Pilotage', children: [
     { item: 'Tableau de bord', icon: 'i-grid', page: 'cockpit', href: '/cockpit', roles: 'manager gest_rh dir admin' },
   ]},
   { group: 'Personnel', children: [
     { item: 'Annuaire', icon: 'i-users', page: 'personnel', href: '/personnel', roles: 'gest_rh manager dir admin' },
+    { item: 'Demandes à valider', icon: 'i-list', page: 'demandes', href: '/demandes', roles: 'manager gest_rh dir admin' },
+    { item: 'Recrutement', icon: 'i-target', page: 'recrutement', href: '/recrutement', roles: 'manager gest_rh dir admin' },
     { item: 'Contrats', icon: 'i-doc', page: 'contrats', href: '/contrats', roles: 'gest_rh paie dir admin' },
-    { item: 'Évaluations', icon: 'i-star', page: 'evaluations', href: '/evaluations', roles: 'manager gest_rh dir admin' },
+    // Évaluations (appréciation RH) descopé de la v1 — sera construit dans benin_hr (round ultérieur).
     { item: 'Séparations', icon: 'i-door', page: 'separations', href: '/separations', roles: 'gest_rh dir admin' },
   ]},
   { group: 'Paie', children: [
@@ -40,10 +46,12 @@ const NAV = [
     { item: 'Déclarations', icon: 'i-megaphone', page: 'declarations', href: '/declarations', roles: 'paie gest_rh dir admin' },
   ]},
   { group: 'Documents', children: [
-    { item: 'Modèles de documents', icon: 'i-stamp', page: 'modeles', href: '/modeles', roles: 'gest_rh paie dir admin' },
+    { item: 'Modèles de documents', icon: 'i-stamp', page: 'modeles', href: '/modeles', roles: 'gest_rh paie dir admin gestion_sm' },
   ]},
   { group: 'Administration', children: [
-    { item: 'Paramètres', icon: 'i-sliders', page: 'parametres', href: '/parametres', roles: 'admin' },
+    { item: 'Onboarding & accès', icon: 'i-users', page: 'onboarding', href: '/onboarding', roles: 'admin gestion_sm' },
+    { item: 'Audit des accès', icon: 'i-eye', page: 'audit-acces', href: '/audit-acces', roles: 'admin dir' },
+    { item: 'Paramètres', icon: 'i-sliders', page: 'parametres', href: '/parametres', roles: 'admin gestion_sm' },
   ]},
 ];
 
@@ -52,8 +60,10 @@ type NavRow =
   | { type: 'item'; item: string; icon: string; page: string; href: string; roles: string; counter?: string };
 const navRows: NavRow[] = [];
 for (const node of NAV) {
+  const visible = node.children.filter((c) => canSee(c.roles));
+  if (!visible.length) continue; // groupe masqué si aucun item autorisé
   navRows.push({ type: 'label', label: node.group });
-  for (const c of node.children) navRows.push({ type: 'item', ...c });
+  for (const c of visible) navRows.push({ type: 'item', ...c });
 }
 ---
 <!doctype html>
@@ -64,7 +74,7 @@ for (const node of NAV) {
     <link rel="icon" href="/assets/lanem-logo.webp" />
     <title>{title}</title>
   </head>
-  <body data-page={page} data-role={DEFAULT_ROLE}>
+  <body data-page={page} data-profiles={profiles.join(' ')}>
     <Sprite />
 
     <!-- Barre mobile (< 900px) -->
@@ -76,17 +86,6 @@ for (const node of NAV) {
     <!-- Barre latérale (rendue côté serveur) -->
     <aside class="nav-side">
       <a class="nav-brand" href="/cockpit"><span class="mark">emela<span>.</span></span><span class="ctx">RH &amp; Paie</span></a>
-
-      <div class="nav-rolebox">
-        <div class="lbl"><span class="pill">Démo</span>Rôle actif</div>
-        <div class="nav-roleselect">
-          <span class="dot" id="rh-role-dot"></span>
-          <select id="rh-role-sel" aria-label="Rôle actif">
-            {ROLES.map((r) => <option value={r.id}>{r.label}</option>)}
-          </select>
-          <Icon name="i-caretdown" cls="ico-sm chev" />
-        </div>
-      </div>
 
       <nav class="nav-scroll">
         {navRows.map((row) => row.type === 'label' ? (
@@ -101,8 +100,8 @@ for (const node of NAV) {
       </nav>
 
       <div class="nav-user">
-        <span class="av">RH</span>
-        <span><span class="nm">Rachelle Houngbé</span><span class="rl">Gestionnaire RH</span></span>
+        <span class="av">{initials}</span>
+        <span><span class="nm">{fullName}</span><span class="rl">{profileLabel}</span></span>
       </div>
     </aside>
 

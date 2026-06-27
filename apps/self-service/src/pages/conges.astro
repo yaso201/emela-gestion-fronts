@@ -122,7 +122,7 @@ const leaveReqs = await getLeaveRequests();
     <div class="em-field">
       <label class="em-field-label" for="dc-type">Type de congé</label>
       <select class="em-select" id="dc-type">
-        {balances.map((b) => <option>{b.label} — {b.remaining} j restants</option>)}
+        {balances.map((b) => <option value={b.label}>{b.label} — {b.remaining} j restants</option>)}
       </select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
@@ -133,8 +133,28 @@ const leaveReqs = await getLeaveRequests();
     <div class="em-field"><label class="em-field-label" for="dc-note">Motif / commentaire <span style="font-weight:400;color:var(--text-tertiary)">(optionnel)</span></label><textarea class="em-textarea" id="dc-note" placeholder="Précisez si nécessaire…"></textarea></div>
   <Fragment slot="foot">
     <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
-    <button class="em-btn em-btn--primary" onclick="HrDrawer.close(); hrToast('Demande de congé transmise', true);">Envoyer la demande</button></Fragment>
+    <button class="em-btn em-btn--primary" id="dc-submit">Envoyer la demande</button></Fragment>
 </Drawer>
+<script is:inline>
+  // Dépôt réel d'une demande de congé → POST /api/requests/conge (employee résolu serveur).
+  (function () {
+    var submit = document.getElementById('dc-submit');
+    if (!submit) return;
+    function v(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; }
+    submit.addEventListener('click', async function () {
+      var body = { leave_type: v('dc-type'), from_date: v('dc-from'), to_date: v('dc-to'), reason: v('dc-note') };
+      if (!body.leave_type || !body.from_date || !body.to_date) { hrToast('Type et dates requis.', false); return; }
+      submit.disabled = true;
+      try {
+        var res = await fetch('/api/requests/conge', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        var data = await res.json().catch(function () { return {}; });
+        if (res.ok) { HrDrawer.close(); hrToast('Demande de congé transmise', true); setTimeout(function () { location.reload(); }, 700); }
+        else { hrToast(data.error || 'Échec de la demande', false); }
+      } catch (e) { hrToast('Erreur réseau', false); }
+      finally { submit.disabled = false; }
+    });
+  })();
+</script>
 <script is:inline>
   (function () {
     var LEAVE = [

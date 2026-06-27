@@ -1,5 +1,14 @@
 ---
-// Accueil RH → redirige vers le tableau de bord.
-// (Le rôle actif, persistant, peut rediriger ailleurs via shell.js.)
-return Astro.redirect('/cockpit');
+import { getProfiles } from '@emela/shared/session';
+
+// Accueil RH → page d'atterrissage selon le profil RÉEL (chaque profil n'a pas
+// accès au tableau de bord ; ex. paie/finance → /paie, gestion_sm → /parametres).
+const PRIORITY = ['admin', 'dir', 'gest_rh', 'manager', 'paie', 'finance', 'gestion_sm'];
+const HOME: Record<string, string> = {
+  admin: '/cockpit', dir: '/cockpit', gest_rh: '/cockpit', manager: '/cockpit',
+  paie: '/paie', finance: '/paie', gestion_sm: '/parametres',
+};
+const profiles = getProfiles();
+const primary = PRIORITY.find((p) => profiles.includes(p));
+return Astro.redirect(primary ? HOME[primary] : '/acces-refuse');
 ---
