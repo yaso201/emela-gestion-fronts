@@ -106,10 +106,10 @@ const pending = requests.filter((r) => r.status === 'pending').length;
   </div>
   <div class="em-field" id="dd-amt-field"><label class="em-field-label" for="dd-amt">Montant (FCFA)</label><input class="em-input" id="dd-amt" inputmode="numeric" placeholder="ex. 150 000" /></div>
   <div class="em-field"><label class="em-field-label" for="dd-obj">Objet / justification</label><textarea class="em-textarea" id="dd-obj" placeholder="Précisez le motif de la demande…"></textarea></div>
-  <div class="em-field" id="dd-justif-field">
-    <label class="em-field-label">Justificatif <span style="font-weight:400;color:var(--text-tertiary)">(notes de frais)</span></label>
-    <label class="em-file-drop"><input type="file" /><span class="em-file-drop-icon"><Icon name="i-receipt" cls="ico-lg" /></span><span class="em-file-drop-title">Joindre un reçu</span><span class="em-file-drop-hint">PDF, JPG ou PNG — 5 Mo max</span></label>
-  </div>
+  <!-- Justificatif retiré (v1bis) : create_note_de_frais n'expose pas de champ pièce jointe ;
+       le fichier était silencieusement jeté (l'utilisateur croyait son reçu envoyé). TODO back :
+       ajouter Attach à create_note_de_frais, puis recâbler l'upload ici (self-scope, comme la
+       pièce jointe Facture Externe). -->
   <Fragment slot="foot">
     <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
     <button class="em-btn em-btn--primary" id="dd-submit">Déposer la demande</button>
@@ -121,7 +121,6 @@ const pending = requests.filter((r) => r.status === 'pending').length;
   var sel = document.getElementById('dd-type');
   if(!sel) return;
   var amt = document.getElementById('dd-amt-field');
-  var justif = document.getElementById('dd-justif-field');
   var note = document.getElementById('dd-att-note');
   var cat = document.getElementById('dd-cat-field');
   var period = document.getElementById('dd-period-field');
@@ -131,7 +130,6 @@ const pending = requests.filter((r) => r.status === 'pending').length;
     var v = sel.value;
     var isAtt = v.indexOf('att-') === 0, isHeures = v === 'heures', isFrais = v === 'frais';
     amt.hidden = isAtt || isHeures;
-    justif.hidden = !isFrais;
     note.hidden = !isAtt;
     cat.hidden = !isFrais;
     period.hidden = !isHeures;
@@ -140,8 +138,8 @@ const pending = requests.filter((r) => r.status === 'pending').length;
   sel.addEventListener('change', sync);
   sync();
 
-  // Dépôt réel (write-path) : acompte / note de frais / heures sup → POST /api/requests/<type>.
-  // (Les attestations restent à brancher côté back ; congé = drawer dédié dans /conges.)
+  // Dépôt réel (write-path) : acompte / note de frais / heures sup / attestation → POST /api/requests/<type>.
+  // (Attestation : create_attestation + /api/requests/attestation opérationnels ; congé = drawer dédié dans /conges.)
   async function post(url, body){
     var res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
     return { ok: res.ok, data: await res.json().catch(function(){ return {}; }) };
@@ -178,7 +176,7 @@ const pending = requests.filter((r) => r.status === 'pending').length;
       url = '/api/requests/attestation';
       body = { attestation_type: ATT[v], reason: val('dd-obj') };
     } else {
-      HrDrawer.close(); hrToast('Demande déposée', true); return;
+      hrToast('Type de demande non pris en charge.', false); return;
     }
     submit.disabled = true;
     try {
