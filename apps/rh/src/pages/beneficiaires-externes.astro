@@ -1,0 +1,292 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import Icon from '../components/Icon.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import Drawer from '../components/Drawer.astro';
+import { getBeneficiaires } from '@emela/shared/rh-data';
+
+// Data-in réel : REST `Beneficiaire Externe` (DocPerm back — HR User r/w/c, Director r).
+const beneficiaires = await getBeneficiaires();
+const actifs = beneficiaires.filter((b) => b.statut_beneficiaire === 'Actif').length;
+const archives = beneficiaires.length - actifs;
+
+// Présentation (énum back → variante DS). Pas de donnée métier ici.
+const TYPE_VARIANT: Record<string, string> = { Vacataire: 'info', Prestataire: 'accent' };
+const COMPOSANTES_EXISTANTES = [...new Set(beneficiaires.map((b) => b.composante).filter(Boolean))].sort();
+---
+<Layout title="Bénéficiaires externes — emela RH" page="beneficiaires-externes">
+<style is:global>
+  .toolbar { display:flex; gap:var(--space-4); align-items:center; flex-wrap:wrap; margin-bottom:var(--space-6); }
+  .toolbar .em-input-wrap { flex:1; min-width:240px; max-width:380px; }
+  .ben-name { display:flex; align-items:center; gap:var(--space-4); }
+  .ben-av { width:34px; height:34px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .ben-av.vac { background:var(--ink-50); color:var(--ink-700); }
+  .ben-av.pre { background:var(--accent-50); color:var(--accent-700); }
+  .ben-name .nm { font-weight:600; color:var(--text-primary); }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  .row-actions { display:flex; gap:var(--space-2); justify-content:flex-end; align-items:center; }
+  .icon-btn { width:32px; height:32px; border:1px solid var(--border-default); background:var(--surface-paper); border-radius:var(--radius-xs); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary); }
+  .icon-btn:hover { border-color:var(--border-strong); color:var(--text-primary); background:var(--surface-hover); }
+  tr.is-archived td { opacity:.62; }
+  tr.is-archived td .em-badge { opacity:1; }
+  .type-choice { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-3); }
+  .type-opt { border:1.5px solid var(--border-default); border-radius:var(--radius-md); padding:var(--space-4) var(--space-5); cursor:pointer; display:flex; gap:var(--space-3); align-items:flex-start; transition:border-color var(--duration-fast), background var(--duration-fast); position:relative; }
+  .type-opt:hover { border-color:var(--border-strong); }
+  .type-opt input { position:absolute; opacity:0; pointer-events:none; }
+  .type-opt .t-ic { width:32px; height:32px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .type-opt .t-tt { font-size:var(--text-sm); font-weight:600; }
+  .type-opt .t-desc { font-size:var(--text-2xs); color:var(--text-tertiary); margin-top:1px; line-height:1.35; }
+  .type-opt.is-on { border-color:var(--accent-500); background:var(--accent-50); }
+  .type-opt.is-on.vac { border-color:var(--ink-600); background:var(--ink-50); }
+  @media (max-width:880px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div>
+      <h1>Bénéficiaires externes</h1>
+      <p class="sub"><b>{actifs}</b> actif{actifs > 1 ? 's' : ''} · {archives} archivé{archives > 1 ? 's' : ''} · vacataires &amp; prestataires facturables</p>
+    </div>
+    <div class="rh-pagehead-actions">
+      <button class="em-btn em-btn--primary" data-roles="gest_rh admin" data-new><svg class="ico-sm"><use href="#i-plus"/></svg>Nouveau bénéficiaire</button>
+    </div>
+  </div>
+
+  <div class="rh-rolebar readonly" data-roles="dir">
+    <span class="em-badge em-badge--neutral"><svg class="ico-sm"><use href="#i-eye"/></svg>Lecture seule</span>
+    <span>Consultation de l'annuaire des bénéficiaires. La création, la modification et l'archivage relèvent du gestionnaire RH.</span>
+  </div>
+
+  <div class="toolbar">
+    <div class="em-input-wrap">
+      <span class="em-input-icon"><svg class="ico-sm"><use href="#i-search"/></svg></span>
+      <input class="em-input" type="search" placeholder="Rechercher un nom, IFU, référence…" aria-label="Rechercher" data-search />
+    </div>
+    <select class="em-select" style="max-width:200px" aria-label="Type" data-filter-type>
+      <option value="">Tous les types</option>
+      <option value="Vacataire">Vacataire</option>
+      <option value="Prestataire">Prestataire</option>
+    </select>
+    <select class="em-select" style="max-width:190px" aria-label="Statut" data-filter-statut>
+      <option value="">Actifs + archivés</option>
+      <option value="Actif" selected>Actifs seulement</option>
+      <option value="Archive">Archivés</option>
+    </select>
+  </div>
+
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead>
+        <tr>
+          <th>Bénéficiaire</th>
+          <th>Type</th>
+          <th class="hide-md">Identifiant fiscal / composante</th>
+          <th class="hide-md">Réf. fournisseur UF</th>
+          <th>Statut</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {beneficiaires.map((b) => {
+          const isVac = b.type_beneficiaire === 'Vacataire';
+          const arch = b.statut_beneficiaire === 'Archive';
+          const haystack = `${b.nom_complet} ${b.ifu ?? ''} ${b.reference_supplier_uf ?? ''} ${b.name}`.toLowerCase();
+          return (
+            <tr class:list={[{ 'is-archived': arch }]} data-row data-type={b.type_beneficiaire} data-statut={b.statut_beneficiaire} data-search={haystack} data-ben={JSON.stringify(b)}>
+              <td>
+                <div class="ben-name">
+                  <span class:list={["ben-av", isVac ? 'vac' : 'pre']}><svg class="ico-sm"><use href={isVac ? '#i-users' : '#i-building'}/></svg></span>
+                  <div><div class="nm">{b.nom_complet}</div><div class="mono-sm">{b.name}</div></div>
+                </div>
+              </td>
+              <td><span class:list={["em-badge", "em-badge--sm", `em-badge--${TYPE_VARIANT[b.type_beneficiaire] ?? 'neutral'}`]}>{b.type_beneficiaire}</span></td>
+              <td class="hide-md">{isVac ? (b.composante || '—') : <span class="num">IFU {b.ifu || '—'}</span>}</td>
+              <td class="hide-md">{b.reference_supplier_uf ? <span class="num">{b.reference_supplier_uf}</span> : <span class="mono-sm">non lié</span>}</td>
+              <td>{arch ? <StatusBadge variant="neutral" sm>Archivé</StatusBadge> : <StatusBadge variant="success" sm>Actif</StatusBadge>}</td>
+              <td>
+                <div class="row-actions" data-roles="gest_rh admin">
+                  <button class="icon-btn" title="Modifier" data-edit><svg class="ico-sm"><use href="#i-pencil"/></svg></button>
+                  {arch
+                    ? <button class="icon-btn" title="Réactiver" data-statut-set="Actif"><svg class="ico-sm"><use href="#i-arrowright"/></svg></button>
+                    : <button class="icon-btn" title="Archiver" data-statut-set="Archive"><svg class="ico-sm"><use href="#i-folder"/></svg></button>}
+                </div>
+                <div class="row-actions" data-roles="dir"><span class="mono-sm" title="Lecture seule"><svg class="ico-sm" style="vertical-align:-2px"><use href="#i-lock"/></svg></span></div>
+              </td>
+            </tr>
+          );
+        })}
+        <tr data-empty hidden><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:var(--space-9)">Aucun bénéficiaire pour ce filtre.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- Drawer création / édition -->
+<div class="rh-scrim" id="rh-scrim"></div>
+<Drawer id="drawer-ben" title="Nouveau bénéficiaire" sub="La référence BENX-… est attribuée automatiquement.">
+  <input type="hidden" data-f="name" />
+  <div class="em-field">
+    <label class="em-field-label">Type de bénéficiaire <span class="em-required">*</span></label>
+    <div class="type-choice">
+      <label class="type-opt vac" data-type-opt="Vacataire">
+        <input type="radio" name="type_beneficiaire" value="Vacataire" />
+        <span class="t-ic" style="background:var(--ink-50);color:var(--ink-700)"><Icon name="i-users" cls="ico-sm" /></span>
+        <span><span class="t-tt">Vacataire</span><span class="t-desc">Personne physique — enseignant vacataire, intervenant ponctuel</span></span>
+      </label>
+      <label class="type-opt pre" data-type-opt="Prestataire">
+        <input type="radio" name="type_beneficiaire" value="Prestataire" />
+        <span class="t-ic" style="background:var(--accent-50);color:var(--accent-700)"><Icon name="i-building" cls="ico-sm" /></span>
+        <span><span class="t-tt">Prestataire</span><span class="t-desc">Personne morale — société, cabinet, fournisseur de services</span></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="em-field">
+    <label class="em-field-label">Nom complet / raison sociale <span class="em-required">*</span></label>
+    <input class="em-input" data-f="nom_complet" placeholder="ex. Dr. Komlan Adjovi — ou — Cabinet Sinsin SARL" />
+  </div>
+
+  <div class="em-field" data-when="Prestataire" hidden>
+    <label class="em-field-label">IFU — identifiant fiscal unique <span class="em-required">*</span></label>
+    <input class="em-input" data-f="ifu" inputmode="numeric" placeholder="0000 0000 0000 0" />
+    <span class="em-field-help">Obligatoire pour un prestataire (personne morale) — contrôlé au back.</span>
+  </div>
+  <div class="em-field" data-when="Vacataire" hidden>
+    <label class="em-field-label">Composante de rattachement <span class="em-required">*</span></label>
+    {/* TODO BACK-FIXES ④ : référentiel composantes (SRC-COMP, D02 §6.5) inexistant côté back — datalist dérivée des données en attendant */}
+    <input class="em-input" data-f="composante" list="composantes-list" placeholder="Ex. FAST — Sciences & techniques" />
+    <datalist id="composantes-list">{COMPOSANTES_EXISTANTES.map((c) => <option value={c} />)}</datalist>
+    <span class="em-field-help">Obligatoire pour un vacataire — contrôlé au back.</span>
+  </div>
+  <div class="em-field" data-when="Vacataire" hidden>
+    <label class="em-field-label">NPI <span style="font-weight:400;color:var(--text-tertiary)">(facultatif)</span></label>
+    <input class="em-input" data-f="npi" inputmode="numeric" placeholder="Numéro personnel d'identification" />
+  </div>
+  <div class="em-field" data-when="Vacataire" hidden>
+    <label class="em-field-label">Discipline <span style="font-weight:400;color:var(--text-tertiary)">(facultatif)</span></label>
+    <input class="em-input" data-f="discipline" placeholder="ex. Macroéconomie" />
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-5)">
+    <div class="em-field"><label class="em-field-label">E-mail de contact</label><input class="em-input" data-f="contact_email" type="email" placeholder="nom@exemple.bj" /></div>
+    <div class="em-field"><label class="em-field-label">Téléphone</label><input class="em-input" data-f="contact_tel" placeholder="+229 …" /></div>
+  </div>
+
+  <div class="em-alert em-alert--info">
+    <span class="em-alert-icon"><Icon name="i-info" cls="ico-sm" /></span>
+    <div class="em-alert-body"><span class="em-alert-text">Ce répertoire ne gère <b>aucun compte ni accès</b> : il sert uniquement à facturer un vacataire ou un prestataire. La référence fournisseur UF est renseignée automatiquement à la première transmission de facture.</span></div>
+  </div>
+
+  <Fragment slot="foot">
+    <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+    <button class="em-btn em-btn--primary" data-save>Enregistrer</button>
+  </Fragment>
+</Drawer>
+
+<script is:inline>
+  // Bénéficiaires externes : filtres client + CRUD léger (POST proxy + CSRF, reload SSR au succès).
+  (function () {
+    var drawer = document.getElementById('drawer-ben');
+    var byF = function (f) { return drawer.querySelector('[data-f="' + f + '"]'); };
+
+    // ---- Filtres (client — les données restent SSR) ----
+    var state = { q: '', type: '', statut: 'Actif' };
+    function applyFilters() {
+      var shown = 0;
+      document.querySelectorAll('[data-row]').forEach(function (tr) {
+        var ok = (!state.type || tr.getAttribute('data-type') === state.type)
+          && (!state.statut || tr.getAttribute('data-statut') === state.statut)
+          && (!state.q || tr.getAttribute('data-search').indexOf(state.q.toLowerCase()) >= 0);
+        tr.hidden = !ok; if (ok) shown++;
+      });
+      var empty = document.querySelector('[data-empty]'); if (empty) empty.hidden = shown !== 0;
+    }
+    var s = document.querySelector('[data-search]'); if (s) s.addEventListener('input', function (e) { state.q = e.target.value; applyFilters(); });
+    var ft = document.querySelector('[data-filter-type]'); if (ft) ft.addEventListener('change', function (e) { state.type = e.target.value; applyFilters(); });
+    var fs = document.querySelector('[data-filter-statut]'); if (fs) fs.addEventListener('change', function (e) { state.statut = e.target.value; applyFilters(); });
+    applyFilters();
+
+    // ---- Drawer : type conditionnel ----
+    function setType(t) {
+      drawer.querySelectorAll('[data-type-opt]').forEach(function (o) { o.classList.toggle('is-on', o.getAttribute('data-type-opt') === t); });
+      var r = drawer.querySelector('input[name="type_beneficiaire"][value="' + t + '"]'); if (r) r.checked = true;
+      drawer.querySelectorAll('[data-when]').forEach(function (el) { el.hidden = el.getAttribute('data-when') !== t; });
+    }
+    drawer.querySelectorAll('[data-type-opt]').forEach(function (o) { o.addEventListener('click', function () { setType(o.getAttribute('data-type-opt')); }); });
+
+    var FIELDS = ['nom_complet', 'ifu', 'npi', 'composante', 'discipline', 'contact_email', 'contact_tel'];
+    function reset() {
+      byF('name').value = '';
+      FIELDS.forEach(function (f) { var el = byF(f); if (el) el.value = ''; });
+      drawer.querySelectorAll('[data-type-opt]').forEach(function (o) { o.classList.remove('is-on'); });
+      drawer.querySelectorAll('input[name="type_beneficiaire"]').forEach(function (r) { r.checked = false; });
+      drawer.querySelectorAll('[data-when]').forEach(function (el) { el.hidden = true; });
+    }
+    function openNew() {
+      reset();
+      drawer.querySelector('#drawer-ben-title').textContent = 'Nouveau bénéficiaire';
+      drawer.querySelector('.rh-drawer-head p').textContent = 'La référence BENX-… est attribuée automatiquement.';
+      window.RhDrawer.open('drawer-ben');
+    }
+    function openEdit(b) {
+      reset();
+      drawer.querySelector('#drawer-ben-title').textContent = 'Modifier ' + b.name;
+      drawer.querySelector('.rh-drawer-head p').textContent = b.nom_complet;
+      byF('name').value = b.name;
+      if (b.type_beneficiaire) setType(b.type_beneficiaire);
+      FIELDS.forEach(function (f) { var el = byF(f); if (el) el.value = b[f] || ''; });
+      window.RhDrawer.open('drawer-ben');
+    }
+
+    var newBtn = document.querySelector('[data-new]'); if (newBtn) newBtn.addEventListener('click', openNew);
+    document.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        try { openEdit(JSON.parse(btn.closest('[data-row]').getAttribute('data-ben'))); } catch (_) {}
+      });
+    });
+
+    // ---- Écritures (POST proxy + CSRF géré côté serveur ; reload SSR au succès) ----
+    async function post(url, payload) {
+      var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      var d = {}; try { d = await res.json(); } catch (_) {}
+      return { ok: res.ok, data: d };
+    }
+
+    var saveBtn = document.querySelector('[data-save]');
+    if (saveBtn) saveBtn.addEventListener('click', async function () {
+      var t = drawer.querySelector('input[name="type_beneficiaire"]:checked');
+      if (!t) { rhToast('Choisir un type de bénéficiaire.', false); return; }
+      var nom = byF('nom_complet').value.trim();
+      if (!nom) { rhToast('Le nom / la raison sociale est requis.', false); return; }
+      if (t.value === 'Prestataire' && !byF('ifu').value.trim()) { rhToast('IFU obligatoire pour un prestataire.', false); return; }
+      if (t.value === 'Vacataire' && !byF('composante').value) { rhToast('Composante obligatoire pour un vacataire.', false); return; }
+
+      var payload = { type_beneficiaire: t.value, nom_complet: nom };
+      FIELDS.forEach(function (f) { if (f !== 'nom_complet') { var el = byF(f); if (el) payload[f] = el.value.trim(); } });
+      var name = byF('name').value; if (name) payload.name = name;
+
+      saveBtn.disabled = true;
+      var r = await post('/api/beneficiaires/save', payload);
+      saveBtn.disabled = false;
+      if (!r.ok) { rhToast(r.data.error || "Échec de l'enregistrement", false); return; }
+      window.RhDrawer.close();
+      rhToast(name ? 'Bénéficiaire mis à jour' : 'Bénéficiaire créé', true);
+      setTimeout(function () { location.reload(); }, 600);
+    });
+
+    document.querySelectorAll('[data-statut-set]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var tr = btn.closest('[data-row]');
+        var b; try { b = JSON.parse(tr.getAttribute('data-ben')); } catch (_) { return; }
+        var statut = btn.getAttribute('data-statut-set');
+        btn.disabled = true;
+        var r = await post('/api/beneficiaires/archive', { name: b.name, statut_beneficiaire: statut });
+        btn.disabled = false;
+        if (!r.ok) { rhToast(r.data.error || 'Échec de la mise à jour', false); return; }
+        rhToast(statut === 'Archive' ? b.name + ' archivé' : b.name + ' réactivé', true);
+        setTimeout(function () { location.reload(); }, 600);
+      });
+    });
+  })();
+</script>
+</Layout>

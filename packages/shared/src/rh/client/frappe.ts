@@ -172,6 +172,93 @@ export const decideFacture = (name: string, approve: boolean): Promise<FactureDe
 export const transmettreFacture = (name: string): Promise<FactureTransmission> =>
   writeMethod(`${FEXT}.transmettre_facture`, { name });
 
+// ---- Bénéficiaires externes (P6-02, amont DEC-38) : CRUD léger REST + CSRF ----
+// Data-in/out via /api/resource (DocPerm back : HR User r/w/c, Director r, System
+// Manager r/w/c/d). Aucun champ d'accès/compte (frontière O2, DEC-40) : le doctype
+// n'en porte pas. La validate() back reste l'autorité (nom requis ; IFU si
+// Prestataire ; composante si Vacataire).
+
+export type BeneficiaireExterne = {
+  name: string;
+  type_beneficiaire: 'Vacataire' | 'Prestataire' | string;
+  nom_complet: string;
+  ifu?: string; npi?: string;
+  contact_email?: string; contact_tel?: string;
+  composante?: string; discipline?: string;
+  reference_supplier_uf?: string;
+  statut_beneficiaire: 'Actif' | 'Archive' | string;
+  creation?: string;
+};
+export type BeneficiaireInput = {
+  name?: string;
+  type_beneficiaire: 'Vacataire' | 'Prestataire';
+  nom_complet: string;
+  ifu?: string; npi?: string;
+  contact_email?: string; contact_tel?: string;
+  composante?: string; discipline?: string;
+};
+
+/** Jeton CSRF de la session (même source que writeMethod). */
+async function csrfToken(): Promise<string> {
+  const r = await method<{ csrf_token: string }>('benin_hr.api.cockpit.get_csrf_token');
+  return r?.csrf_token ?? '';
+}
+
+/** Création REST d'un doc (POST /api/resource/<doctype>) — CSRF + session. */
+async function resourceCreate<T = any>(doctype: string, doc: Record<string, unknown>): Promise<T> {
+  const csrf = await csrfToken();
+  const res = await fetch(`${BASE}/resource/${encodeURIComponent(doctype)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Frappe-CSRF-Token': csrf, ...authHeaders() },
+    body: JSON.stringify(doc),
+  });
+  if (!res.ok) throw new Error(`benin_hr ${doctype} POST → ${res.status}`);
+  return (await res.json()).data as T;
+}
+
+/** Mise à jour REST d'un doc (PUT /api/resource/<doctype>/<name>) — CSRF + session. */
+async function resourceUpdate<T = any>(doctype: string, name: string, patch: Record<string, unknown>): Promise<T> {
+  const csrf = await csrfToken();
+  const res = await fetch(`${BASE}/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Frappe-CSRF-Token': csrf, ...authHeaders() },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`benin_hr ${doctype}/${name} PUT → ${res.status}`);
+  return (await res.json()).data as T;
+}
+
+const BENEF = 'Beneficiaire Externe';
+
+/** Annuaire des bénéficiaires externes (lecture REST scopée DocPerm). */
+export const getBeneficiaires = (): Promise<BeneficiaireExterne[]> =>
+  resource<BeneficiaireExterne[]>(
+    BENEF,
+    ['name', 'type_beneficiaire', 'nom_complet', 'ifu', 'npi', 'contact_email',
+     'contact_tel', 'composante', 'discipline', 'reference_supplier_uf',
+     'statut_beneficiaire', 'creation'],
+    {}, 'creation desc',
+  );
+
+/** Création (si pas de `name`) ou mise à jour d'un bénéficiaire. Le back valide
+ *  (nom ; IFU si Prestataire ; composante si Vacataire). Jamais de statut à la
+ *  création (défaut back = Actif) ni de reference_supplier_uf (peuplée à la
+ *  transmission de facture). */
+export const saveBeneficiaire = async (input: BeneficiaireInput): Promise<{ name: string; statut_beneficiaire: string }> => {
+  const { name, ...doc } = input;
+  const saved = name
+    ? await resourceUpdate<BeneficiaireExterne>(BENEF, name, doc)
+    : await resourceCreate<BeneficiaireExterne>(BENEF, doc);
+  return { name: saved.name, statut_beneficiaire: saved.statut_beneficiaire };
+};
+
+/** Bascule du cycle de vie RH local (Actif ⇄ Archive). PAS une suppression, PAS un
+ *  statut d'accès (frontière O2, DEC-40). */
+export const setBeneficiaireStatut = async (name: string, statut_beneficiaire: 'Actif' | 'Archive'): Promise<{ name: string; statut_beneficiaire: string }> => {
+  const saved = await resourceUpdate<BeneficiaireExterne>(BENEF, name, { statut_beneficiaire });
+  return { name: saved.name, statut_beneficiaire: saved.statut_beneficiaire };
+};
+
 // ---- Étape 3 : réquisitions d'embauche (demande → validation → création) ----
 const ONB = 'benin_hr.api.onboarding';
 

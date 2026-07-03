@@ -25,6 +25,9 @@ const ROUTE_PROFILES: Record<string, string[]> = {
   // Factures externes (DEC-38) : sans `paie` — Payroll User n'a pas de DocPerm
   // read sur Facture Externe (la page serait vide) ; l'enforcement reste back.
   '/factures-externes': ['gest_rh', 'dir', 'admin'],
+  // Bénéficiaires externes (P6-02) : gest_rh/admin en écriture, dir en lecture
+  // (rolebar readonly in-page). Miroir DocPerm : HR User r/w/c, Director r.
+  '/beneficiaires-externes': ['gest_rh', 'dir', 'admin'],
   '/modeles': ['gest_rh', 'paie', 'dir', 'admin', 'gestion_sm'],
   '/onboarding': ['admin', 'gestion_sm'],
   '/parametres': ['admin', 'gestion_sm'],
@@ -45,6 +48,9 @@ const API_PROFILES: Record<string, string[]> = {
   // Factures externes : le back gate finement (only_for + SoD contrôleur).
   '/api/factures/decision': ['gest_rh', 'dir', 'admin'],
   '/api/factures/transmission': ['gest_rh', 'dir', 'admin'],
+  // Bénéficiaires externes : écriture REST gardée finement par les DocPerm back.
+  '/api/beneficiaires/save': ['gest_rh', 'admin'],
+  '/api/beneficiaires/archive': ['gest_rh', 'admin'],
 };
 
 export const onRequest = defineMiddleware(async (context, next) => {
