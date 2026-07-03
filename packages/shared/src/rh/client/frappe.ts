@@ -117,9 +117,60 @@ export const updatePayrollParameter = (parameter_key: string, parameter_value: s
 export const previewSeparation = (employee: string, separation_type: string, reason = ''): Promise<any> =>
   method('benin_hr.api.separation.preview_separation', { employee_name: employee, separation_type, reason });
 
-/** Génération d'une déclaration/état social à la demande (lecture). */
+/** Génération d'une déclaration/état social à la demande. POST (et non GET) :
+ *  les sorties csv/pdf INSÈRENT un doc File privé — en GET, Frappe rollback la
+ *  transaction en fin de requête et la download_url renvoyée pointe dans le vide
+ *  (403). Le POST (CSRF forwardé) committe le File. */
 export const generateDeclaration = (methodName: string, params: Record<string, string>): Promise<any> =>
-  method(`benin_hr.api.declarations.${methodName}`, params);
+  writeMethod(`benin_hr.api.declarations.${methodName}`, params);
+
+// ---- CH-FRONT-DECL : factures externes (guichet unique DEC-38) ----
+const FEXT = 'benin_hr.api.ess_facture';
+
+export type FactureExterne = {
+  name: string; beneficiaire: string; beneficiaire_nom: string;
+  type_beneficiaire?: 'Vacataire' | 'Prestataire' | string;
+  montant: number; periode: string; date_facture?: string;
+  reference_piece?: string; piece_jointe?: string;
+  statut: 'Soumise' | 'A transmettre' | 'Transmise' | 'Rejetee';
+  validated_by?: string; integration_log?: string; transmis_le?: string; creation?: string;
+};
+export type FactureDecision = { name: string; statut: string; idempotency_key?: string };
+export type FactureTransmission = {
+  ok: boolean; statut: string; purchase_invoice?: string; supplier?: string;
+  integration_log?: string; idempotent?: boolean; reason?: string;
+};
+
+/** File des factures externes (lecture REST scopée par les DocPerms back :
+ *  HR User / Director / System Manager) + jointure légère des bénéficiaires. */
+export const getFacturesExternes = async (): Promise<FactureExterne[]> => {
+  const rows = await resource<any[]>(
+    'Facture Externe',
+    ['name', 'beneficiaire', 'type_beneficiaire', 'montant', 'periode', 'date_facture',
+     'reference_piece', 'piece_jointe', 'statut', 'validated_by', 'integration_log',
+     'transmis_le', 'creation'],
+    {}, 'creation desc',
+  );
+  const benefIds = [...new Set(rows.map((r) => r.beneficiaire).filter(Boolean))];
+  const benefs = benefIds.length
+    ? await resource<any[]>('Beneficiaire Externe', ['name', 'nom_complet', 'type_beneficiaire'], { name: ['in', benefIds] })
+    : [];
+  const byId = Object.fromEntries(benefs.map((b) => [b.name, b]));
+  return rows.map((r) => ({
+    ...r,
+    beneficiaire_nom: byId[r.beneficiaire]?.nom_complet ?? r.beneficiaire,
+    type_beneficiaire: r.type_beneficiaire || byId[r.beneficiaire]?.type_beneficiaire || '',
+  }));
+};
+
+/** Validation (→ « A transmettre ») ou rejet d'une facture externe. SoD back. */
+export const decideFacture = (name: string, approve: boolean): Promise<FactureDecision> =>
+  writeMethod(`${FEXT}.decide_facture`, { name, approve });
+
+/** Transmission à UF (le back crée la PI en brouillon — STOP avant paiement).
+ *  ok:false = rejouable (UF indisponible / refus) : la facture reste « A transmettre ». */
+export const transmettreFacture = (name: string): Promise<FactureTransmission> =>
+  writeMethod(`${FEXT}.transmettre_facture`, { name });
 
 // ---- Étape 3 : réquisitions d'embauche (demande → validation → création) ----
 const ONB = 'benin_hr.api.onboarding';

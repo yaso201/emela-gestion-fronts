@@ -6,7 +6,7 @@ export const prerender = false;
 const ALLOWED = new Set([
   'generate_cnss_declaration', 'generate_its_declaration', 'generate_vps_declaration',
   'generate_its_annual_recap', 'generate_cnss_annual_recap', 'generate_salary_register',
-  'generate_nominative_declaration',
+  'generate_nominative_declaration', 'generate_its_vps_declaration',
 ]);
 
 /** Génération d'une déclaration/état social (lecture ; le back gate DECLARATION_ROLES). */

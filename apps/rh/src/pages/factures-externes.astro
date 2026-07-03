@@ -1,0 +1,136 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import StatusBadge from '../components/StatusBadge.astro';
+import { getFacturesExternes, fcfa, type FactureExterne } from '@emela/shared/rh-data';
+
+// File des factures externes (guichet unique DEC-38) : vacataires + prestataires.
+// Lecture REST scopée par les DocPerms back (HR User / Director / System Manager).
+let factures: FactureExterne[] = [];
+let loadError = '';
+try {
+  factures = await getFacturesExternes();
+} catch (e) {
+  console.error('[factures-externes]', e);
+  loadError = 'Impossible de charger les factures (back indisponible ou accès refusé).';
+}
+
+const STATUTS = ['Soumise', 'A transmettre', 'Transmise', 'Rejetee'] as const;
+const FX_STATUS: Record<string, { variant: string; label: string }> = {
+  'Soumise': { variant: 'warning', label: 'Soumise' },
+  'A transmettre': { variant: 'info', label: 'À transmettre' },
+  'Transmise': { variant: 'success', label: 'Transmise' },
+  'Rejetee': { variant: 'error', label: 'Rejetée' },
+};
+const counts = Object.fromEntries(STATUTS.map((s) => [s, factures.filter((f) => f.statut === s).length]));
+const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
+---
+<Layout title="Factures externes — emela RH" page="factures-externes">
+<style is:global>
+  .fx-counters { display:flex; gap:var(--space-4); flex-wrap:wrap; margin-bottom:var(--space-6); }
+  .fx-counter { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-md); padding:var(--space-4) var(--space-6); min-width:132px; }
+  .fx-counter .n { font-size:var(--text-xl); font-weight:700; font-variant-numeric:tabular-nums; }
+  .fx-counter .l { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:2px; }
+  .fx-actions { display:flex; gap:var(--space-2); justify-content:flex-end; flex-wrap:wrap; }
+  .fx-benef .t { font-weight:600; }
+  .fx-benef .m { font-size:var(--text-xs); color:var(--text-tertiary); margin-top:1px; }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div>
+      <h1>Factures externes</h1>
+      <p class="sub">Guichet unique de soumission — vacataires &amp; prestataires (DEC-38). La validation transmet à la comptabilité (UF) ; <b>le paiement est traité côté finance</b>.</p>
+    </div>
+  </div>
+
+  {loadError && <div class="rh-rolebar readonly"><span class="em-badge em-badge--warning"><svg class="ico-sm"><use href="#i-warning"/></svg>Indisponible</span><span>{loadError}</span></div>}
+
+  <div class="fx-counters">
+    {STATUTS.map((s) => (
+      <div class="fx-counter">
+        <div class="n">{counts[s]}</div>
+        <div class="l"><StatusBadge variant={FX_STATUS[s].variant} sm>{FX_STATUS[s].label}</StatusBadge></div>
+      </div>
+    ))}
+  </div>
+
+  <div class="em-table-wrap">
+    <table class="em-table">
+      <thead><tr><th>Bénéficiaire</th><th>Période</th><th class="em-cell-num">Montant</th><th>Pièce</th><th>Date</th><th>Statut</th><th></th></tr></thead>
+      <tbody>
+        {factures.length === 0 && !loadError && (
+          <tr><td colspan="7" style="color:var(--text-tertiary)">Aucune facture externe soumise pour le moment.</td></tr>
+        )}
+        {factures.map((f) => {
+          const st = FX_STATUS[f.statut] ?? { variant: 'neutral', label: f.statut };
+          return (
+            <tr>
+              <td class="fx-benef"><div class="t">{f.beneficiaire_nom}</div><div class="m">{f.type_beneficiaire || '—'} · {f.beneficiaire}</div></td>
+              <td>{f.periode}</td>
+              <td class="em-cell-num num">{fcfa(f.montant)}</td>
+              <td>{f.reference_piece || '—'}</td>
+              <td>{fmtDate(f.date_facture)}</td>
+              <td><StatusBadge variant={st.variant}>{st.label}</StatusBadge></td>
+              <td>
+                <div class="fx-actions">
+                  {f.statut === 'Soumise' && (
+                    <>
+                      <button class="em-btn em-btn--primary em-btn--sm" data-fx-action="valider" data-fx-name={f.name}><svg class="ico-sm"><use href="#i-check"/></svg>Valider</button>
+                      <button class="em-btn em-btn--secondary em-btn--sm" data-fx-action="rejeter" data-fx-name={f.name}><svg class="ico-sm"><use href="#i-x"/></svg>Rejeter</button>
+                    </>
+                  )}
+                  {f.statut === 'A transmettre' && (
+                    <button class="em-btn em-btn--primary em-btn--sm" data-fx-action="transmettre" data-fx-name={f.name}><svg class="ico-sm"><use href="#i-arrowright"/></svg>Transmettre à UF</button>
+                  )}
+                  {f.statut === 'Transmise' && (
+                    <span style="font-size:var(--text-xs);color:var(--text-tertiary)">Transmise le {fmtDate(f.transmis_le)} — suite côté finance</span>
+                  )}
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script is:inline>
+  // Actions de la file : Valider/Rejeter (decide_facture) + Transmettre (transmettre_facture).
+  // Le back gate rôle + SoD ; ok:false transmission = rejouable (statut inchangé).
+  (function () {
+    document.addEventListener('click', async function (e) {
+      var btn = e.target.closest('[data-fx-action]');
+      if (!btn) return;
+      e.preventDefault();
+      var action = btn.getAttribute('data-fx-action');
+      var name = btn.getAttribute('data-fx-name');
+      btn.disabled = true;
+      try {
+        var res, d;
+        if (action === 'transmettre') {
+          res = await fetch('/api/factures/transmission', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name }),
+          });
+          d = await res.json();
+          if (!res.ok) { rhToast(d.error || 'Échec de la transmission', false); return; }
+          if (!d.ok) { rhToast(d.reason || 'Transmission indisponible — la facture reste à transmettre.', false); return; }
+          rhToast('Transmise à UF' + (d.purchase_invoice ? ' — PI ' + d.purchase_invoice + ' (brouillon)' : ''), true);
+        } else {
+          res = await fetch('/api/factures/decision', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, approve: action === 'valider' }),
+          });
+          d = await res.json();
+          if (!res.ok) { rhToast(d.error || 'Échec de la validation', false); return; }
+          rhToast(action === 'valider' ? 'Facture validée — à transmettre' : 'Facture rejetée', true);
+        }
+        setTimeout(function () { location.reload(); }, 650);
+      } catch (err) { rhToast('Erreur réseau', false); }
+      finally { btn.disabled = false; }
+    });
+  })();
+</script>
+
+</Layout>

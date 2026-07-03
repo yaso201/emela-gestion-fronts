@@ -6,6 +6,14 @@ import { getDeclarations, DECLARATION_STATUS, fcfa } from '@emela/shared/rh-data
 // Historique : déclarations déjà produites ou transmises.
 const declarations = (await getDeclarations()).filter((d) => d.status !== 'a_produire');
 const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-2026-04': '9 mai 2026', 'CNSS-2026-T1': '13 avr. 2026' };
+
+// Bordereau unique ITS+VPS (DEC-37) : période par défaut = mois écoulé (échéance le 10).
+const now = new Date();
+const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const ivpYear = String(prev.getFullYear());
+const ivpMonth = String(prev.getMonth() + 1).padStart(2, '0');
+const MONTHS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const YEARS = [ivpYear, String(prev.getFullYear() - 1)];
 ---
 <Layout title="Déclarations — emela RH" page="declarations">
 <style is:global>
@@ -25,6 +33,9 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
   .decl-line.total { border-top:1.5px solid var(--border-strong); padding-top:var(--space-4); margin-top:var(--space-2); }
   .decl-line.total .v { font-size:var(--text-md); }
   .decl-foot { padding:var(--space-5) var(--space-7); border-top:1px solid var(--border-subtle); background:var(--sand-25); display:flex; gap:var(--space-3); flex-wrap:wrap; }
+  .decl-ic.ivp { background:var(--accent-50); color:var(--accent-700); }
+  .ivp-controls { display:flex; gap:var(--space-3); align-items:center; }
+  .ivp-controls select { font:inherit; font-size:var(--text-sm); padding:6px 10px; border:1px solid var(--border-default); border-radius:var(--radius-sm); background:var(--surface-paper); color:inherit; }
 </style>
 
 <main class="rh-page">
@@ -76,6 +87,32 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
         <button class="em-btn em-btn--secondary" onclick="rhToast('Téléchargement de l\'état ITS (PDF)…')"><svg class="ico-sm"><use href="#i-download"/></svg>État PDF</button>
       </div>
     </div>
+
+    <!-- Bordereau unique ITS+VPS (DEC-37 / CYV-02 §16 bis) -->
+    <div class="decl">
+      <div class="decl-head">
+        <span class="decl-ic ivp"><svg class="ico-lg"><use href="#i-stamp"/></svg></span>
+        <div><div class="tt">Bordereau unique ITS + VPS</div><div class="st">Formulaire DGI « Impôts sur salaires » · échéance 10 du mois suivant</div></div>
+        <span style="margin-left:auto" class="em-badge em-badge--neutral">Acte unique</span>
+      </div>
+      <div class="decl-body">
+        <div class="ivp-controls">
+          <label for="ivp-month" style="font-size:var(--text-sm);color:var(--text-secondary)">Période</label>
+          <select id="ivp-month">{MONTHS_FR.map((m, i) => { const v = String(i + 1).padStart(2, '0'); return <option value={v} selected={v === ivpMonth}>{m}</option>; })}</select>
+          <select id="ivp-year">{YEARS.map((y) => <option value={y} selected={y === ivpYear}>{y}</option>)}</select>
+        </div>
+        <div class="decl-line"><span class="k">1. Nombre de salariés</span><span class="v" id="ivp-l1">—</span></div>
+        <div class="decl-line"><span class="k">2. Montant brut des salaires</span><span class="v" id="ivp-l2">—</span></div>
+        <div class="decl-line"><span class="k">3. Montant IRPP/TS (ITS)</span><span class="v" id="ivp-l3">—</span></div>
+        <div class="decl-line"><span class="k">4. Montant VPS</span><span class="v" id="ivp-l4">—</span></div>
+        <div class="decl-line total"><span class="k"><b>5. Total à reverser (3 + 4)</b></span><span class="v" id="ivp-l5">—</span></div>
+      </div>
+      <div class="decl-foot" data-roles="paie admin">
+        <button class="em-btn em-btn--secondary" id="ivp-apercu" data-ivp-format="json"><svg class="ico-sm"><use href="#i-refresh"/></svg>Aperçu</button>
+        <button class="em-btn em-btn--secondary" data-ivp-format="csv"><svg class="ico-sm"><use href="#i-download"/></svg>CSV</button>
+        <button class="em-btn em-btn--secondary" data-ivp-format="pdf"><svg class="ico-sm"><use href="#i-download"/></svg>PDF</button>
+      </div>
+    </div>
   </div>
 
   <!-- États sociaux -->
@@ -112,6 +149,21 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
 <script is:inline>
   // Génération à la demande : POST /api/declarations/generate (back gate DECLARATION_ROLES).
   (function () {
+    // Fichier privé (csv/pdf) : téléchargement via le proxy (le navigateur n'a
+    // pas de session sur le domaine Frappe — le proxy forwarde le sid).
+    function downloadPrivate(downloadUrl) {
+      window.location.href = '/api/declarations/download?path=' + encodeURIComponent(downloadUrl);
+    }
+    async function generate(method, params) {
+      var res = await fetch('/api/declarations/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: method, params: params }),
+      });
+      var d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Échec de la génération');
+      return d;
+    }
+
     document.addEventListener('click', async function (e) {
       var btn = e.target.closest('.decl-gen');
       if (!btn) return;
@@ -121,17 +173,41 @@ const issuedOn: Record<string, string> = { 'ITS-2026-05': '9 juin 2026', 'ITS-20
       try { params = JSON.parse(btn.getAttribute('data-params') || '{}'); } catch (_) {}
       btn.disabled = true;
       try {
-        var res = await fetch('/api/declarations/generate', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ method: method, params: params }),
-        });
-        var d = await res.json();
-        if (!res.ok) { rhToast(d.error || 'Échec de la génération', false); return; }
+        var d = await generate(method, params);
+        if (d.download_url) { downloadPrivate(d.download_url); rhToast('Téléchargement de l\'état…', true); return; }
         var type = d.declaration_type || 'État';
         var period = d.period || '';
         var n = Array.isArray(d.lignes) ? d.lignes.length : null;
         rhToast(type + (period ? ' ' + period : '') + ' générée' + (n != null ? ' — ' + n + ' ligne(s)' : ''), true);
-      } catch (err) { rhToast('Erreur réseau', false); }
+      } catch (err) { rhToast(err && err.message ? err.message : 'Erreur réseau', false); }
+      finally { btn.disabled = false; }
+    });
+
+    // Bordereau unique ITS+VPS (DEC-37) : aperçu (5 lignes de liquidation) ou
+    // export CSV/PDF via le proxy. Période lue des sélecteurs au moment du clic.
+    var F = function (v) { return (typeof v === 'number' ? v : 0).toLocaleString('fr-FR') + ' F'; };
+    document.addEventListener('click', async function (e) {
+      var btn = e.target.closest('[data-ivp-format]');
+      if (!btn) return;
+      e.preventDefault();
+      var format = btn.getAttribute('data-ivp-format');
+      var params = {
+        year: document.getElementById('ivp-year').value,
+        month: document.getElementById('ivp-month').value,
+        output_format: format,
+      };
+      btn.disabled = true;
+      try {
+        var d = await generate('generate_its_vps_declaration', params);
+        if (d.download_url) { downloadPrivate(d.download_url); rhToast('Bordereau ITS+VPS — téléchargement…', true); return; }
+        // Aperçu JSON : les 5 lignes de liquidation (CYV-02 §16 bis).
+        document.getElementById('ivp-l1').textContent = String(d.nb_salaries != null ? d.nb_salaries : '—');
+        document.getElementById('ivp-l2').textContent = F(d.total_brut);
+        document.getElementById('ivp-l3').textContent = F(d.total_its);
+        document.getElementById('ivp-l4').textContent = F(d.total_vps);
+        document.getElementById('ivp-l5').textContent = F(d.total_a_reverser);
+        rhToast('Bordereau ITS+VPS ' + (d.period_label || d.period || '') + ' — échéance ' + (d.echeance || ''), true);
+      } catch (err) { rhToast(err && err.message ? err.message : 'Erreur réseau', false); }
       finally { btn.disabled = false; }
     });
   })();

@@ -22,6 +22,9 @@ const ROUTE_PROFILES: Record<string, string[]> = {
   '/paie': ['paie', 'finance', 'dir', 'admin'],
   '/validation': ['manager', 'finance', 'dir', 'admin'],
   '/declarations': ['paie', 'gest_rh', 'dir', 'admin'],
+  // Factures externes (DEC-38) : sans `paie` — Payroll User n'a pas de DocPerm
+  // read sur Facture Externe (la page serait vide) ; l'enforcement reste back.
+  '/factures-externes': ['gest_rh', 'dir', 'admin'],
   '/modeles': ['gest_rh', 'paie', 'dir', 'admin', 'gestion_sm'],
   '/onboarding': ['admin', 'gestion_sm'],
   '/parametres': ['admin', 'gestion_sm'],
@@ -39,6 +42,9 @@ const API_PROFILES: Record<string, string[]> = {
   '/api/recrutement/validation': ['dir', 'admin'],
   '/api/recrutement/creation': ['gest_rh', 'admin'],
   '/api/audit-acces/revue': ['admin', 'dir'],
+  // Factures externes : le back gate finement (only_for + SoD contrôleur).
+  '/api/factures/decision': ['gest_rh', 'dir', 'admin'],
+  '/api/factures/transmission': ['gest_rh', 'dir', 'admin'],
 };
 
 export const onRequest = defineMiddleware(async (context, next) => {
