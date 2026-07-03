@@ -16,8 +16,8 @@ import * as mock from './mock';
 import { frappeSource } from '../client/frappe';
 
 // ---- Validation RH : liste des demandes en attente + actions (POST + CSRF) ----
-export { getPendingValidations, decideAcompte, decideNoteDeFrais, decideHeuresSup, decideConge, decideAttestation, provisionUser, updatePayrollParameter, previewSeparation, generateDeclaration, getOnboardingRequests, createOnboardingRequest, decideOnboardingRequest, createEmployeeFromRequest, getAccessAudit, getAccessReview, recordAccessReview, getFacturesExternes, decideFacture, transmettreFacture, getBeneficiaires, saveBeneficiaire, setBeneficiaireStatut } from '../client/frappe';
-export type { DecisionResult, PendingValidations, PendingRow, OnboardingContext, OnboardingRequest, AccessEvent, AccessHolder, AccessReviewContext, FactureExterne, FactureDecision, FactureTransmission, BeneficiaireExterne, BeneficiaireInput } from '../client/frappe';
+export { getPendingValidations, decideAcompte, decideNoteDeFrais, decideHeuresSup, decideConge, decideAttestation, provisionUser, updatePayrollParameter, previewSeparation, generateDeclaration, getOnboardingRequests, createOnboardingRequest, decideOnboardingRequest, createEmployeeFromRequest, getAccessAudit, getAccessReview, recordAccessReview, getFacturesExternes, decideFacture, transmettreFacture, getBeneficiaires, saveBeneficiaire, setBeneficiaireStatut, getRetirementStatus, getCareerStatement } from '../client/frappe';
+export type { DecisionResult, PendingValidations, PendingRow, OnboardingContext, OnboardingRequest, AccessEvent, AccessHolder, AccessReviewContext, FactureExterne, FactureDecision, FactureTransmission, BeneficiaireExterne, BeneficiaireInput, RetirementStatus, CareerStatement, CareerLine } from '../client/frappe';
 
 const mockSource: RhDataSource = {
   getKpis:               async () => mock.kpis,

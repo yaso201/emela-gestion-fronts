@@ -1,0 +1,194 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getDirectory } from '@emela/shared/rh-data';
+
+// Data-in : annuaire réel (REST Employee). Le STATUT retraite se lit à la demande
+// par salarié (retirement_status) — 1 appel/salarié : pas de vue cohorte ici
+// (check_retirement_alerts n'est pas @whitelist → BACK-GAP assumé ci-dessous).
+// L'annuaire peut être ILLISIBLE pour un profil pourtant autorisé sur la page
+// (ex. paie : only_for retraite ✅ mais pas de DocPerm read Employee) → repli
+// vide + bandeau « frontière de permission » au lieu d'un 500 (prescription a).
+let directory: Awaited<ReturnType<typeof getDirectory>> = [];
+let directoryUnavailable = false;
+try {
+  directory = await getDirectory();
+} catch (e) {
+  console.error('[retraite] annuaire non lisible pour ce profil', e);
+  directoryUnavailable = true;
+}
+---
+<Layout title="Retraite — emela RH" page="retraite">
+<style is:global>
+  .rt-grid { display:grid; grid-template-columns:340px 1fr; gap:var(--space-6); align-items:start; }
+  @media (max-width:980px){ .rt-grid { grid-template-columns:1fr; } }
+  .rt-list { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; }
+  .rt-list-head { padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--border-subtle); }
+  .rt-list-scroll { max-height:560px; overflow-y:auto; }
+  .rt-emp { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-4) var(--space-5); border-top:1px solid var(--border-subtle); cursor:pointer; background:none; border-left:0; border-right:0; border-bottom:0; width:100%; text-align:left; font:inherit; color:inherit; transition:background var(--duration-fast); }
+  .rt-emp:first-child { border-top:0; }
+  .rt-emp:hover { background:var(--sand-25); }
+  .rt-emp.is-sel { background:var(--ink-50); }
+  .rt-emp .av { width:34px; height:34px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; }
+  .rt-emp .m { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .rt-emp .nm { font-size:var(--text-sm); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rt-emp .mt { font-size:var(--text-xs); color:var(--text-tertiary); }
+  .rt-detail { background:var(--surface-paper); border:1px solid var(--border-default); border-radius:var(--radius-lg); overflow:hidden; }
+  .rt-dhead { display:flex; align-items:center; gap:var(--space-4); padding:var(--space-6) var(--space-7); border-bottom:1px solid var(--border-subtle); }
+  .rt-dhead .av { width:46px; height:46px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; flex-shrink:0; }
+  .rt-dhead .nm { font-size:var(--text-lg); font-weight:600; }
+  .rt-dhead .mt { font-size:var(--text-sm); color:var(--text-tertiary); margin-top:1px; }
+  .rt-facts { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--border-subtle); }
+  @media (max-width:560px){ .rt-facts { grid-template-columns:repeat(2,1fr); } }
+  .rt-fact { background:var(--surface-paper); padding:var(--space-5) var(--space-6); }
+  .rt-fact .k { font-size:var(--text-2xs); font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); }
+  .rt-fact .v { font-size:var(--text-lg); font-weight:700; margin-top:var(--space-2); font-variant-numeric:tabular-nums; }
+  .rt-fact .v.sm { font-size:var(--text-base); }
+  .rt-career { padding:var(--space-6) var(--space-7); border-top:1px solid var(--border-subtle); }
+  .rt-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4); margin-top:var(--space-4); }
+  @media (max-width:560px){ .rt-tiles { grid-template-columns:1fr; } }
+  .rt-tile { border:1px solid var(--border-default); border-radius:var(--radius-md); padding:var(--space-5); }
+  .rt-tile .tk { font-size:var(--text-xs); color:var(--text-tertiary); display:flex; align-items:center; gap:var(--space-2); }
+  .rt-tile .tv { font-size:var(--text-xl); font-weight:700; font-family:var(--font-mono); font-variant-numeric:tabular-nums; margin-top:var(--space-3); }
+  .rt-foot { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-5) var(--space-7); border-top:1px solid var(--border-subtle); background:var(--sand-25); flex-wrap:wrap; }
+  .rt-empty { padding:var(--space-13) var(--space-7); text-align:center; color:var(--text-tertiary); }
+  .gap-card { border:1.5px dashed var(--border-strong); border-radius:var(--radius-lg); background:var(--sand-25); padding:var(--space-7); display:flex; gap:var(--space-5); align-items:flex-start; margin-bottom:var(--space-4); }
+  .gap-card .g-ic { width:44px; height:44px; border-radius:var(--radius-md); background:var(--warning-50); color:var(--warning-700); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .gap-card .g-tt { font-size:var(--text-base); font-weight:600; margin-bottom:var(--space-2); }
+  .gap-card p { font-size:var(--text-sm); color:var(--text-secondary); line-height:var(--leading-relaxed); margin:0; }
+  .gap-card .todo { font-family:var(--font-mono); font-size:var(--text-xs); background:var(--ink-900); color:#fff; padding:2px 8px; border-radius:var(--radius-xs); display:inline-block; margin-top:var(--space-3); }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div>
+      <h1>Retraite</h1>
+      <p class="sub">Suivi des départs · régime CNSS (âge légal <b>60 ans</b>) · le SIRH <b>suit</b>, la CNSS <b>calcule</b> la pension</p>
+    </div>
+  </div>
+
+  <div class="em-alert em-alert--info" style="margin-bottom:var(--space-7)">
+    <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span>
+    <div class="em-alert-body"><span class="em-alert-text">Consultation <b>HR-administrée</b> : statut et relevé de carrière de n'importe quel salarié, réservés RH / paie / direction. Le montant de la pension n'est <b>pas</b> calculé ici — il relève de la CNSS (réf. A7).</span></div>
+  </div>
+
+  <!-- Cohorte d'approche — BACK-GAP (check_retirement_alerts non @whitelist) -->
+  <p class="rh-section-label"><svg class="ico-sm"><use href="#i-flag"/></svg>Cohorte d'approche (12 mois)</p>
+  <div class="gap-card">
+    <span class="g-ic"><svg class="ico-lg"><use href="#i-warning"/></svg></span>
+    <div>
+      <div class="g-tt">Vue cohorte indisponible — écart back tracé</div>
+      <p>La liste automatique des salariés approchant l'âge légal existe au back (<code class="mono-sm">check_retirement_alerts</code>) mais comme <b>job planifié</b>, <b>non exposé</b> en <code class="mono-sm">@whitelist</code> : le front ne peut pas l'appeler. Conformément à « 0 endpoint inventé », cette vue reste en <b>repli vide</b> — aucune alerte fabriquée. Sélectionnez un salarié ci-dessous pour son statut individuel (prouvé).</p>
+      <span class="todo">TODO back — exposer une méthode liste whitelistée (cohorte d'alertes) → puis câbler cette section</span>
+    </div>
+  </div>
+
+  {directoryUnavailable && <div class="rh-rolebar readonly"><span class="em-badge em-badge--warning"><svg class="ico-sm"><use href="#i-warning"/></svg>Annuaire indisponible</span><span>Annuaire non lisible pour votre profil (permission Employee absente) — la consultation par la liste est indisponible. Frontière de permission, pas une panne. Élargissement éventuel = décision de la matrice des rôles (CH-RÔLES).</span></div>}
+
+  <p class="rh-section-label"><svg class="ico-sm"><use href="#i-clock"/></svg>Statut individuel &amp; relevé de carrière</p>
+  <div class="rt-grid">
+    <div class="rt-list">
+      <div class="rt-list-head">
+        <div class="em-input-wrap">
+          <span class="em-input-icon"><svg class="ico-sm"><use href="#i-search"/></svg></span>
+          <input class="em-input" type="search" placeholder="Rechercher un salarié…" aria-label="Rechercher" data-search />
+        </div>
+      </div>
+      <div class="rt-list-scroll">
+        {directory.map((e) => (
+          <button class="rt-emp" data-emp={e.id} data-name={e.employeeName} data-search={`${e.employeeName} ${e.id} ${e.department}`.toLowerCase()}>
+            <span class="av">{e.initials}</span>
+            <span class="m"><span class="nm">{e.employeeName}</span><span class="mt">{e.designation} · {e.department}</span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+
+    <div class="rt-detail" data-detail>
+      <div class="rt-empty">
+        <svg class="ico-lg" style="width:40px;height:40px;color:var(--border-strong)"><use href="#i-clock"/></svg>
+        <div style="font-size:var(--text-sm);margin-top:var(--space-4)">Sélectionnez un salarié pour afficher son statut retraite.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script is:inline>
+  // Retraite : sélection salarié → POST /api/retraite/status → rendu du statut (back)
+  // + relevé de carrière. Aucun calcul retraite côté client : le back est l'autorité.
+  (function () {
+    var ELIG_LABEL = { pension: 'Pension (≥ 180 mois)', allocation: 'Allocation de vieillesse', aucun: 'Aucun droit constitué' };
+    var ELIG_VAR = { pension: 'success', allocation: 'info', aucun: 'neutral' };
+    var ALERT_MONTHS = 12; // ⚠️ seuil d'AFFICHAGE uniquement — le seuil OFFICIEL est le paramètre back éditable RETIREMENT.ALERT_MONTHS_BEFORE (peut diverger). À dériver de la future méthode cohorte whitelistée (BACK-FIXES ③) dès qu'elle existe.
+
+    function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function initials(n) { return (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0] || ''; }).join('').toUpperCase(); }
+    function fmtD(s) { if (!s) return '—'; var p = String(s).split('-'); if (p.length < 3) return s; return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); }
+    function badge(s) {
+      if (s.error) return '<span class="em-badge em-badge--sm em-badge--error"><span class="em-badge-dot"></span>Paramètre manquant</span>';
+      if (s.retired) return '<span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Âge légal atteint</span>';
+      if (typeof s.months_to_retirement === 'number' && s.months_to_retirement <= ALERT_MONTHS) return '<span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Départ proche</span>';
+      if (s.early_retirement_possible) return '<span class="em-badge em-badge--sm em-badge--info"><span class="em-badge-dot"></span>Anticipé possible</span>';
+      return '<span class="em-badge em-badge--sm em-badge--neutral"><span class="em-badge-dot"></span>En activité</span>';
+    }
+    function fact(k, v, sm) { return '<div class="rt-fact"><div class="k">' + k + '</div><div class="v' + (sm ? ' sm' : '') + '">' + v + '</div></div>'; }
+
+    var box = document.querySelector('[data-detail]');
+    var selected = null;
+
+    function loading(name) {
+      box.innerHTML = '<div class="rt-empty"><div style="font-size:var(--text-sm)">Lecture du statut de ' + esc(name) + '…</div></div>';
+    }
+    function renderError(msg) {
+      box.innerHTML = '<div style="padding:var(--space-7)"><div class="em-alert em-alert--error"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><span class="em-alert-text">' + esc(msg) + '</span></div></div></div>';
+    }
+    function render(name, id, data) {
+      var s = data.status || {}; var c = data.career || {};
+      var head = '<div class="rt-dhead"><span class="av">' + initials(name) + '</span><div style="flex:1;min-width:0"><div class="nm">' + esc(name) + '</div><div class="mt"><span class="mono-sm">' + esc(id) + '</span></div></div>' + badge(s) + '</div>';
+      if (s.error) {
+        box.innerHTML = head + '<div style="padding:var(--space-7)"><div class="em-alert em-alert--error"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><div class="em-alert-title">Statut indisponible</div><span class="em-alert-text">Réponse back : <span class="mono-sm">{ "employee": "' + esc(s.employee || id) + '", "error": "' + esc(s.error) + '" }</span>. Le dossier salarié doit être complété avant tout suivi retraite (pattern L6a — la page affiche l\'erreur sans planter).</span></div></div></div>';
+        return;
+      }
+      var facts = '<div class="rt-facts">'
+        + fact('Âge', esc(s.age) + ' ans')
+        + fact('Départ légal', fmtD(s.legal_retirement_date), true)
+        + fact('Mois avant départ', s.retired ? '<span style="color:var(--warning-700)">atteint</span>' : esc(s.months_to_retirement))
+        + fact('Mois cotisés', esc(s.months_contributed))
+        + fact('Éligibilité', '<span class="em-badge em-badge--sm em-badge--' + (ELIG_VAR[s.eligibility] || 'neutral') + '">' + (ELIG_LABEL[s.eligibility] || esc(s.eligibility)) + '</span>', true)
+        + fact('Départ anticipé', s.early_retirement_possible ? '<span style="color:var(--success-700)">possible</span>' : '—')
+        + '</div>';
+      var career = '<div class="rt-career"><p class="rh-section-label" style="margin:0 0 var(--space-2)"><svg class="ico-sm"><use href="#i-coins"/></svg>Relevé de carrière</p>'
+        + '<div class="rt-tiles">'
+        + '<div class="rt-tile"><div class="tk"><svg class="ico-sm"><use href="#i-cal"/></svg>Mois cotisés</div><div class="tv">' + esc(c.mois_cotises != null ? c.mois_cotises : '—') + '</div></div>'
+        + '<div class="rt-tile"><div class="tk"><svg class="ico-sm"><use href="#i-money"/></svg>Brut cotisé cumulé</div><div class="tv" style="font-size:var(--text-lg)">' + window.fcfa(c.total_brut_cotise || 0) + '</div></div>'
+        + '<div class="rt-tile"><div class="tk"><svg class="ico-sm"><use href="#i-shieldcheck"/></svg>CNSS salariale</div><div class="tv" style="font-size:var(--text-lg)">' + window.fcfa(c.total_cnss_salarie || 0) + '</div></div>'
+        + '</div>'
+        + '<div class="em-alert em-alert--neutral" style="margin-top:var(--space-5)"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Le <b>montant de pension</b> n\'est pas calculé par le SIRH : ces éléments pré-constituent le dossier CNSS, source officielle du calcul.</span></div></div>'
+        + '</div>';
+      box.innerHTML = head + facts + career;
+    }
+
+    async function select(btn) {
+      var id = btn.getAttribute('data-emp'); var name = btn.getAttribute('data-name');
+      if (selected === id) return;
+      selected = id;
+      document.querySelectorAll('.rt-emp').forEach(function (b) { b.classList.toggle('is-sel', b === btn); });
+      loading(name);
+      try {
+        var res = await fetch('/api/retraite/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employee: id }) });
+        var d = await res.json();
+        if (!res.ok) { renderError(d.error || 'Échec de la lecture du statut retraite.'); return; }
+        render(name, id, d);
+      } catch (_) { renderError('Erreur réseau.'); }
+    }
+
+    document.querySelectorAll('.rt-emp').forEach(function (b) { b.addEventListener('click', function () { select(b); }); });
+
+    var search = document.querySelector('[data-search]');
+    if (search) search.addEventListener('input', function (e) {
+      var q = e.target.value.toLowerCase();
+      document.querySelectorAll('.rt-emp').forEach(function (b) { b.hidden = q && b.getAttribute('data-search').indexOf(q) < 0; });
+    });
+  })();
+</script>
+</Layout>

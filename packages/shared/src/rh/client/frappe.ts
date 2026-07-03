@@ -117,6 +117,35 @@ export const updatePayrollParameter = (parameter_key: string, parameter_value: s
 export const previewSeparation = (employee: string, separation_type: string, reason = ''): Promise<any> =>
   method('benin_hr.api.separation.preview_separation', { employee_name: employee, separation_type, reason });
 
+// ---- Retraite (Lot 3 / 3.6) : suivi HR-administré (lecture) ----
+// Le SIRH SUIT (âge, mois cotisés, éligibilité, relevé) ; la CNSS CALCULE la
+// pension (réf. A7). retirement_status renvoie {employee, error} (HTTP 200) si
+// paramètres/date de naissance absents (pattern L6a). La vue COHORTE
+// (check_retirement_alerts) n'est PAS whitelistée → BACK-GAP (aucun getter ici).
+
+export type RetirementStatus =
+  | {
+      employee: string; date_of_birth: string; age: number;
+      legal_retirement_date: string; months_to_retirement: number; retired: boolean;
+      months_contributed: number; eligibility: 'pension' | 'allocation' | 'aucun';
+      early_retirement_possible: boolean; error?: undefined;
+    }
+  | { employee: string; error: string; date_of_birth?: string | null };
+
+export type CareerLine = { period: string; brut: number; cnss_salarie: number };
+export type CareerStatement = {
+  employee: string; mois_cotises: number;
+  total_brut_cotise: number; total_cnss_salarie: number; lignes: CareerLine[];
+};
+
+/** Statut retraite d'un salarié (lecture ; only_for RH/paie/dir au back). */
+export const getRetirementStatus = (employee: string, reference_date?: string): Promise<RetirementStatus> =>
+  method('benin_hr.api.retirement.retirement_status', reference_date ? { employee, reference_date } : { employee });
+
+/** Relevé de carrière (pré-constitution dossier CNSS ; lecture). */
+export const getCareerStatement = (employee: string): Promise<CareerStatement> =>
+  method('benin_hr.api.retirement.career_statement', { employee });
+
 /** Génération d'une déclaration/état social à la demande. POST (et non GET) :
  *  les sorties csv/pdf INSÈRENT un doc File privé — en GET, Frappe rollback la
  *  transaction en fin de requête et la download_url renvoyée pointe dans le vide

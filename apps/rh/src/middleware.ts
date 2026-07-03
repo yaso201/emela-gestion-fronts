@@ -28,6 +28,9 @@ const ROUTE_PROFILES: Record<string, string[]> = {
   // Bénéficiaires externes (P6-02) : gest_rh/admin en écriture, dir en lecture
   // (rolebar readonly in-page). Miroir DocPerm : HR User r/w/c, Director r.
   '/beneficiaires-externes': ['gest_rh', 'dir', 'admin'],
+  // Retraite (Lot 3.6) : HR-administré, lecture seule. Miroir de only_for
+  // (HR User / Payroll User / Director / System Manager).
+  '/retraite': ['gest_rh', 'paie', 'dir', 'admin'],
   '/modeles': ['gest_rh', 'paie', 'dir', 'admin', 'gestion_sm'],
   '/onboarding': ['admin', 'gestion_sm'],
   '/parametres': ['admin', 'gestion_sm'],
@@ -51,6 +54,7 @@ const API_PROFILES: Record<string, string[]> = {
   // Bénéficiaires externes : écriture REST gardée finement par les DocPerm back.
   '/api/beneficiaires/save': ['gest_rh', 'admin'],
   '/api/beneficiaires/archive': ['gest_rh', 'admin'],
+  '/api/retraite/status': ['gest_rh', 'paie', 'dir', 'admin'],
 };
 
 export const onRequest = defineMiddleware(async (context, next) => {
