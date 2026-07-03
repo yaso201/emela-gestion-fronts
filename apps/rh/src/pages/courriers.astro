@@ -1,0 +1,163 @@
+---
+import Layout from '../layouts/RhLayout.astro';
+import { getPendingValidations, getDeliveredAttestations } from '@emela/shared/rh-data';
+
+// Data-in réel :
+//  • File à délivrer = get_pending_validations().attestations (scope hr) — la SoD est
+//    imposée AU BACK (les demandes de l'approbateur lui-même sont déjà exclues).
+//  • Historique = REST Attestation (Delivree / Rejete) + jointure des noms salariés.
+const pending = await getPendingValidations();
+const queue = pending.attestations ?? [];
+const delivered = await getDeliveredAttestations();
+
+const TYPE_LABEL: Record<string, string> = {
+  Travail: 'Attestation de travail',
+  Assiduite: "Attestation d'assiduité",
+  'Mission enseignement': "Attestation de mission d'enseignement",
+};
+const initials = (n: string) => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+const MONTHS = ['', 'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+const dfr = (s?: string) => { if (!s) return '—'; const p = String(s).slice(0, 10).split('-'); return p.length < 3 ? s : `${+p[2]} ${MONTHS[+p[1]]} ${p[0]}`; };
+---
+<Layout title="Courriers — emela RH" page="courriers">
+<style is:global>
+  .em-tabs { margin-bottom:var(--space-6); }
+  .tabpane[hidden] { display:none; }
+  .emp-name { display:flex; align-items:center; gap:var(--space-4); }
+  .emp-av { width:34px; height:34px; border-radius:50%; background:var(--ink-100); color:var(--ink-800); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; flex-shrink:0; }
+  .emp-name .nm { font-weight:600; color:var(--text-primary); }
+  .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
+  .row-actions { display:flex; gap:var(--space-2); justify-content:flex-end; align-items:center; }
+  .link-btn { background:none; border:0; color:var(--ink-700); font:inherit; font-weight:600; font-size:var(--text-xs); cursor:pointer; display:inline-flex; align-items:center; gap:4px; padding:4px 6px; border-radius:var(--radius-xs); text-decoration:none; }
+  .link-btn:hover { background:var(--surface-hover); color:var(--ink-900); }
+  .gap-card { border:1.5px dashed var(--border-strong); border-radius:var(--radius-lg); background:var(--sand-25); padding:var(--space-7); display:flex; gap:var(--space-5); align-items:flex-start; }
+  .gap-card .g-ic { width:44px; height:44px; border-radius:var(--radius-md); background:var(--warning-50); color:var(--warning-700); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .gap-card .g-tt { font-size:var(--text-base); font-weight:600; margin-bottom:var(--space-2); }
+  .gap-card p { font-size:var(--text-sm); color:var(--text-secondary); line-height:var(--leading-relaxed); margin:0; }
+  .gap-card .todo { font-family:var(--font-mono); font-size:var(--text-xs); background:var(--ink-900); color:#fff; padding:2px 8px; border-radius:var(--radius-xs); display:inline-block; margin-top:var(--space-3); }
+  @media (max-width:880px){ .hide-md { display:none; } }
+</style>
+
+<main class="rh-page">
+  <div class="rh-pagehead">
+    <div>
+      <h1>Courriers</h1>
+      <p class="sub"><b>{queue.length}</b> attestation{queue.length > 1 ? 's' : ''} à délivrer · documents RH nominatifs</p>
+    </div>
+  </div>
+
+  <div class="em-tabs" role="tablist">
+    <button class="em-tab is-active" role="tab" aria-selected="true" data-tab="attestations"><svg class="ico-sm" style="vertical-align:-2px;margin-right:6px"><use href="#i-stamp"/></svg>Attestations {queue.length > 0 && <span class="em-counter">{queue.length}</span>}</button>
+    <button class="em-tab" role="tab" aria-selected="false" data-tab="lettres"><svg class="ico-sm" style="vertical-align:-2px;margin-right:6px"><use href="#i-doc"/></svg>Lettres RH</button>
+  </div>
+
+  <!-- ===== Attestations ===== -->
+  <div class="tabpane" data-pane="attestations">
+    <div class="em-alert em-alert--info" style="margin-bottom:var(--space-6)">
+      <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-info"/></svg></span>
+      <div class="em-alert-body"><span class="em-alert-text"><b>Séparation des tâches</b> imposée au back : la file <b>n'affiche jamais vos propres demandes</b> (exclues à la source par <code class="mono-sm">get_pending_validations</code>). Chaque attestation délivrée porte un identifiant de vérification public (anti-faux).</span></div>
+    </div>
+
+    <p class="rh-section-label" style="margin-top:0"><svg class="ico-sm"><use href="#i-clock"/></svg>À délivrer</p>
+    <div class="em-table-wrap">
+      <table class="em-table">
+        <thead><tr><th>Salarié</th><th>Type d'attestation</th><th class="hide-md">Demandée le</th><th>Statut</th><th style="text-align:right">Décision</th></tr></thead>
+        <tbody>
+          {queue.length === 0 && <tr><td colspan="5" style="text-align:center;color:var(--text-tertiary);padding:var(--space-9)">Aucune attestation en attente.</td></tr>}
+          {queue.map((a) => (
+            <tr data-row data-name={a.name}>
+              <td><div class="emp-name"><span class="emp-av">{initials(a.employee_name)}</span><div><div class="nm">{a.employee_name}</div><div class="mono-sm">{a.name}</div></div></div></td>
+              <td>{TYPE_LABEL[a.attestation_type ?? ''] ?? a.attestation_type}</td>
+              <td class="hide-md"><span class="num">{dfr(a.request_date)}</span></td>
+              <td><span class="em-badge em-badge--sm em-badge--info"><span class="em-badge-dot"></span>En attente</span></td>
+              <td>
+                <div class="row-actions">
+                  <button class="em-btn em-btn--secondary em-btn--sm" data-decide="reject"><svg class="ico-sm"><use href="#i-x"/></svg>Refuser</button>
+                  <button class="em-btn em-btn--primary em-btn--sm" data-decide="approve"><svg class="ico-sm"><use href="#i-check"/></svg>Délivrer</button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <p class="rh-section-label"><svg class="ico-sm"><use href="#i-shieldcheck"/></svg>Délivrées récemment</p>
+    <div class="em-table-wrap">
+      <table class="em-table">
+        <thead><tr><th>Référence</th><th>Salarié</th><th class="hide-md">Type</th><th class="hide-md">Délivrée par</th><th>Statut</th><th style="text-align:right">Document</th></tr></thead>
+        <tbody>
+          {delivered.length === 0 && <tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:var(--space-9)">Aucune attestation délivrée.</td></tr>}
+          {delivered.map((a) => {
+            const ok = a.status === 'Delivree';
+            return (
+              <tr>
+                <td><span class="num">{a.name}</span></td>
+                <td>{a.employee_name}</td>
+                <td class="hide-md">{TYPE_LABEL[a.attestation_type ?? ''] ?? a.attestation_type}</td>
+                <td class="hide-md"><span class="mono-sm">{a.delivered_by ?? '—'}</span></td>
+                <td>{ok ? <span class="em-badge em-badge--sm em-badge--success"><span class="em-badge-dot"></span>Délivrée</span> : <span class="em-badge em-badge--sm em-badge--error"><span class="em-badge-dot"></span>Refusée</span>}</td>
+                <td>
+                  {ok
+                    ? <div class="row-actions">
+                        {a.verification_id && <a class="link-btn" href={`/verifier?ref=${encodeURIComponent(a.name)}&token=${encodeURIComponent(a.verification_id)}`} target="_blank" rel="noopener"><svg class="ico-sm"><use href="#i-shieldcheck"/></svg>Vérifier</a>}
+                        <a class="em-btn em-btn--secondary em-btn--sm" href={`/api/courriers/pdf?name=${encodeURIComponent(a.name)}`} target="_blank" rel="noopener"><svg class="ico-sm"><use href="#i-download"/></svg>PDF</a>
+                      </div>
+                    : <span class="mono-sm">—</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Lettres RH (BACK-GAP DEC-26) ===== -->
+  <div class="tabpane" data-pane="lettres" hidden>
+    <div class="gap-card">
+      <span class="g-ic"><svg class="ico-lg"><use href="#i-warning"/></svg></span>
+      <div>
+        <div class="g-tt">Générateur de lettres RH indisponible — écart back tracé (DEC-26)</div>
+        <p>Aucun générateur <b>HR Letter</b> n'existe côté back <code class="mono-sm">benin_hr</code> (recherche <code class="mono-sm">hr_letter / generate_*_letter</code> → 0). Conformément à « 0 endpoint inventé », cette section reste en <b>repli vide</b> — aucune génération de courrier simulée. Seul le flux <b>Attestations</b> (prouvé) est câblé.</p>
+        <span class="todo">Nouveau chantier back CH-COURRIERS — exposer un générateur HR Letter → puis câbler cet onglet</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script is:inline>
+  // Courriers : décision d'attestation → POST /api/validations/attestation (proxy
+  // existant → decide_attestation). Reload SSR au succès. La SoD est gardée au back.
+  (function () {
+    async function post(url, payload) {
+      var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      var d = {}; try { d = await res.json(); } catch (_) {}
+      return { ok: res.ok, data: d };
+    }
+    document.querySelectorAll('[data-decide]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var tr = btn.closest('[data-row]'); if (!tr) return;
+        var name = tr.getAttribute('data-name');
+        var approve = btn.getAttribute('data-decide') === 'approve';
+        tr.querySelectorAll('[data-decide]').forEach(function (b) { b.disabled = true; });
+        var r = await post('/api/validations/attestation', { name: name, approve: approve });
+        if (!r.ok) {
+          tr.querySelectorAll('[data-decide]').forEach(function (b) { b.disabled = false; });
+          rhToast(r.data.error || 'Échec de la décision', false); return;
+        }
+        rhToast(approve ? 'Attestation ' + name + ' délivrée' : 'Attestation ' + name + ' refusée', approve);
+        setTimeout(function () { location.reload(); }, 600);
+      });
+    });
+    document.querySelectorAll('[data-tab]').forEach(function (t) {
+      t.addEventListener('click', function () {
+        document.querySelectorAll('[data-tab]').forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-selected', 'false'); });
+        t.classList.add('is-active'); t.setAttribute('aria-selected', 'true');
+        var pane = t.getAttribute('data-tab');
+        document.querySelectorAll('[data-pane]').forEach(function (p) { p.hidden = p.getAttribute('data-pane') !== pane; });
+      });
+    });
+  })();
+</script>
+</Layout>

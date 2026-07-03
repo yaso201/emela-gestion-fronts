@@ -103,6 +103,41 @@ export const decideConge = (name: string, approve: boolean): Promise<DecisionRes
 export const decideAttestation = (name: string, approve: boolean): Promise<DecisionResult> =>
   writeMethod(`${SELF}.decide_attestation`, { name, approve });
 
+// ---- Courriers : historique des attestations délivrées / refusées (lecture) ----
+// La FILE à délivrer réutilise getPendingValidations().attestations (SoD back).
+// Ici : l'historique via REST Attestation (Delivree/Rejete) + jointure des noms.
+export type AttestationRow = {
+  name: string; employee: string; employee_name: string;
+  attestation_type: string;
+  status: 'Demande' | 'Delivree' | 'Rejete' | string;
+  delivered_by?: string; issued_on?: string;
+  verification_id?: string; document?: string;
+};
+
+/** Attestations délivrées / refusées (historique). DocPerm : HR User / Payroll User
+ *  / Director (lecture) / System Manager. */
+export const getDeliveredAttestations = async (): Promise<AttestationRow[]> => {
+  const rows = await resource<any[]>(
+    'Attestation',
+    ['name', 'employee', 'attestation_type', 'status', 'delivered_by', 'issued_on', 'verification_id', 'document'],
+    { status: ['in', ['Delivree', 'Rejete']] }, 'modified desc',
+  );
+  const ids = [...new Set(rows.map((r) => r.employee).filter(Boolean))];
+  // Leçon ressource-par-ressource : Payroll User n'a pas read Employee (cf. /retraite,
+  // question CH-RÔLES) — la résolution des noms se dégrade en matricules, la page
+  // reste fonctionnelle.
+  let byId: Record<string, string> = {};
+  try {
+    const emps = ids.length
+      ? await resource<any[]>('Employee', ['name', 'employee_name'], { name: ['in', ids] })
+      : [];
+    byId = Object.fromEntries(emps.map((e) => [e.name, e.employee_name]));
+  } catch {
+    byId = {};
+  }
+  return rows.map((r) => ({ ...r, employee_name: byId[r.employee] ?? r.employee }));
+};
+
 /** Onboarding contraint : crée/complète un compte + rôles (whitelist back). */
 export const provisionUser = (input: {
   email: string; full_name: string; roles: string[]; employee?: string;

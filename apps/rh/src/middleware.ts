@@ -31,6 +31,9 @@ const ROUTE_PROFILES: Record<string, string[]> = {
   // Retraite (Lot 3.6) : HR-administré, lecture seule. Miroir de only_for
   // (HR User / Payroll User / Director / System Manager).
   '/retraite': ['gest_rh', 'paie', 'dir', 'admin'],
+  // Courriers (délivrance d'attestations, DEC-26 attestations). Approbateurs =
+  // HR_APPROVER_ROLES (HR User / Payroll User / Director / System Manager).
+  '/courriers': ['gest_rh', 'paie', 'dir', 'admin'],
   '/modeles': ['gest_rh', 'paie', 'dir', 'admin', 'gestion_sm'],
   '/onboarding': ['admin', 'gestion_sm'],
   '/parametres': ['admin', 'gestion_sm'],
