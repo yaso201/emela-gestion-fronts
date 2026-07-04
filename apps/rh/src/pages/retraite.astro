@@ -1,6 +1,6 @@
 ---
 import Layout from '../layouts/RhLayout.astro';
-import { getDirectory } from '@emela/shared/rh-data';
+import { getDirectory, getRetirementCohort, type RetirementCohort } from '@emela/shared/rh-data';
 
 // Data-in : annuaire réel (REST Employee). Le STATUT retraite se lit à la demande
 // par salarié (retirement_status) — 1 appel/salarié : pas de vue cohorte ici
@@ -16,6 +16,19 @@ try {
   console.error('[retraite] annuaire non lisible pour ce profil', e);
   directoryUnavailable = true;
 }
+
+// M0-⑦ : cohorte d'approche via la méthode whitelistée (le SEUIL vient de la
+// réponse — plus aucune fenêtre codée front). Méthode gated only_for = même
+// liste que le gating de la page → lisible par tous ses profils (paie inclus).
+let cohort: RetirementCohort = { alertes: [], incomplets: [] };
+let cohortError = '';
+try {
+  cohort = await getRetirementCohort();
+} catch (e) {
+  console.error('[retraite] cohorte indisponible', e);
+  cohortError = 'Cohorte indisponible (erreur back) — le statut individuel reste fonctionnel.';
+}
+const fmtFr = (s?: string) => { if (!s) return '—'; const p = String(s).split('-'); return p.length < 3 ? s : `${+p[2]}/${+p[1]}/${p[0]}`; };
 ---
 <Layout title="Retraite — emela RH" page="retraite">
 <style is:global>
@@ -59,7 +72,7 @@ try {
   .mono-sm { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--text-tertiary); }
 </style>
 
-<main class="rh-page">
+<main class="rh-page" data-alert-months={cohort.alert_months_before != null ? String(cohort.alert_months_before) : ""}>
   <div class="rh-pagehead">
     <div>
       <h1>Retraite</h1>
@@ -72,16 +85,44 @@ try {
     <div class="em-alert-body"><span class="em-alert-text">Consultation <b>HR-administrée</b> : statut et relevé de carrière de n'importe quel salarié, réservés RH / paie / direction. Le montant de la pension n'est <b>pas</b> calculé ici — il relève de la CNSS (réf. A7).</span></div>
   </div>
 
-  <!-- Cohorte d'approche — BACK-GAP (check_retirement_alerts non @whitelist) -->
-  <p class="rh-section-label"><svg class="ico-sm"><use href="#i-flag"/></svg>Cohorte d'approche (12 mois)</p>
-  <div class="gap-card">
-    <span class="g-ic"><svg class="ico-lg"><use href="#i-warning"/></svg></span>
-    <div>
-      <div class="g-tt">Vue cohorte indisponible — écart back tracé</div>
-      <p>La liste automatique des salariés approchant l'âge légal existe au back (<code class="mono-sm">check_retirement_alerts</code>) mais comme <b>job planifié</b>, <b>non exposé</b> en <code class="mono-sm">@whitelist</code> : le front ne peut pas l'appeler. Conformément à « 0 endpoint inventé », cette vue reste en <b>repli vide</b> — aucune alerte fabriquée. Sélectionnez un salarié ci-dessous pour son statut individuel (prouvé).</p>
-      <span class="todo">TODO back — exposer une méthode liste whitelistée (cohorte d'alertes) → puis câbler cette section</span>
+  <!-- Cohorte d'approche — M0-⑦ : alimentée par retirement_cohort (seuil = paramètre back) -->
+  <p class="rh-section-label"><svg class="ico-sm"><use href="#i-flag"/></svg>Cohorte d'approche{cohort.alert_months_before != null && <> — fenêtre <b>{cohort.alert_months_before} mois</b> <span class="mono-sm">(RETIREMENT.ALERT_MONTHS_BEFORE)</span></>}</p>
+  {(cohortError || cohort.error) ? (
+    <div class="gap-card">
+      <span class="g-ic"><svg class="ico-lg"><use href="#i-warning"/></svg></span>
+      <div>
+        <div class="g-tt">Cohorte indisponible</div>
+        <p>{cohortError || <>Réponse back (pattern L6a) : <span class="mono-sm">{cohort.error}</span>. Renseigner les paramètres retraite (<span class="mono-sm">{(cohort.missing ?? []).join(', ')}</span>) dans Payroll Parameter — la page reste fonctionnelle, aucune alerte n'est fabriquée.</>}</p>
+      </div>
     </div>
-  </div>
+  ) : (
+    <div style="margin-bottom:var(--space-7)">
+      <div class="em-table-wrap">
+        <table class="em-table">
+          <thead><tr><th>Salarié</th><th>Départ légal</th><th class="em-cell-num">Mois restants</th><th>Statut</th></tr></thead>
+          <tbody>
+            {cohort.alertes.length === 0 && <tr><td colspan="4" style="color:var(--text-tertiary)">Aucun salarié actif dans la fenêtre d'alerte.</td></tr>}
+            {cohort.alertes.map((a) => (
+              <tr>
+                <td><b>{a.employee_name}</b> <span class="mono-sm">{a.employee}</span></td>
+                <td>{fmtFr(a.legal_retirement_date)}</td>
+                <td class="em-cell-num num">{a.overdue ? '—' : a.months_to_retirement}</td>
+                <td>{a.overdue
+                  ? <span class="em-badge em-badge--sm em-badge--error"><span class="em-badge-dot"></span>Âge légal dépassé</span>
+                  : <span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Départ proche</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {cohort.incomplets.length > 0 && (
+        <div class="em-alert em-alert--warning" style="margin-top:var(--space-4)">
+          <span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span>
+          <div class="em-alert-body"><span class="em-alert-text"><b>{cohort.incomplets.length}</b> dossier(s) actif(s) sans date de naissance — invisibles de la cohorte tant que le dossier n'est pas complété : {cohort.incomplets.map((i) => i.employee_name || i.employee).join(', ')}.</span></div>
+        </div>
+      )}
+    </div>
+  )}
 
   {directoryUnavailable && <div class="rh-rolebar readonly"><span class="em-badge em-badge--warning"><svg class="ico-sm"><use href="#i-warning"/></svg>Annuaire indisponible</span><span>Annuaire non lisible pour votre profil (permission Employee absente) — la consultation par la liste est indisponible. Frontière de permission, pas une panne. Élargissement éventuel = décision de la matrice des rôles (CH-RÔLES).</span></div>}
 
@@ -119,7 +160,10 @@ try {
   (function () {
     var ELIG_LABEL = { pension: 'Pension (≥ 180 mois)', allocation: 'Allocation de vieillesse', aucun: 'Aucun droit constitué' };
     var ELIG_VAR = { pension: 'success', allocation: 'info', aucun: 'neutral' };
-    var ALERT_MONTHS = 12; // ⚠️ seuil d'AFFICHAGE uniquement — le seuil OFFICIEL est le paramètre back éditable RETIREMENT.ALERT_MONTHS_BEFORE (peut diverger). À dériver de la future méthode cohorte whitelistée (BACK-FIXES ③) dès qu'elle existe.
+    // M0-⑦ : seuil dérivé de la réponse retirement_cohort (SSR, data-attr) —
+    // plus AUCUNE fenêtre codée front ; seuil absent → badge « Départ proche » omis.
+    var amRaw = (document.querySelector('main[data-alert-months]') || {getAttribute:function(){return '';}}).getAttribute('data-alert-months');
+    var ALERT_MONTHS = amRaw === '' || amRaw == null ? null : parseInt(amRaw, 10);
 
     function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function initials(n) { return (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0] || ''; }).join('').toUpperCase(); }
@@ -127,7 +171,7 @@ try {
     function badge(s) {
       if (s.error) return '<span class="em-badge em-badge--sm em-badge--error"><span class="em-badge-dot"></span>Paramètre manquant</span>';
       if (s.retired) return '<span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Âge légal atteint</span>';
-      if (typeof s.months_to_retirement === 'number' && s.months_to_retirement <= ALERT_MONTHS) return '<span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Départ proche</span>';
+      if (ALERT_MONTHS != null && typeof s.months_to_retirement === 'number' && s.months_to_retirement <= ALERT_MONTHS) return '<span class="em-badge em-badge--sm em-badge--warning"><span class="em-badge-dot"></span>Départ proche</span>';
       if (s.early_retirement_possible) return '<span class="em-badge em-badge--sm em-badge--info"><span class="em-badge-dot"></span>Anticipé possible</span>';
       return '<span class="em-badge em-badge--sm em-badge--neutral"><span class="em-badge-dot"></span>En activité</span>';
     }

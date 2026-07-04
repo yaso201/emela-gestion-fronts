@@ -64,7 +64,7 @@ const total = pending.acomptes.length + pending.notes_de_frais.length + pending.
           {pending.notes_de_frais.map((f) => (
             <div class="pv-row">
               <span class="pv-ic"><Icon name="i-list" cls="ico-sm" /></span>
-              <div class="pv-main"><div class="t">{f.employee_name}</div><div class="m">{f.category} · {fcfa(f.amount ?? 0)} · {f.expense_date}</div></div>
+              <div class="pv-main"><div class="t">{f.employee_name}</div><div class="m">{f.category} · {fcfa(f.amount ?? 0)} · {f.expense_date}{f.justificatif && <> · <a href={`/api/declarations/download?path=${encodeURIComponent(f.justificatif)}`} target="_blank" rel="noopener">justificatif</a></>}</div></div>
               <div class="pv-act">
                 <button class="em-btn em-btn--secondary em-btn--sm" data-act="note-de-frais" data-name={f.name} data-approve="false">Refuser</button>
                 <button class="em-btn em-btn--primary em-btn--sm" data-act="note-de-frais" data-name={f.name} data-approve="true">Valider</button>

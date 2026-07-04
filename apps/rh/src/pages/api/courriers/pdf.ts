@@ -12,6 +12,9 @@ export const GET: APIRoute = async ({ url, cookies }) => {
   if (!sid) return new Response('Non authentifié.', { status: 401 });
   const name = url.searchParams.get('name');
   if (!name) return new Response('name requis.', { status: 400 });
+  // Allowlist stricte (M0-⑤, revue sécurité) : nom de document Frappe attendu —
+  // valide AVANT le fetch et AVANT toute insertion dans un header.
+  if (!/^[A-Za-z0-9._-]{1,64}$/.test(name)) return new Response('name invalide.', { status: 400 });
 
   try {
     const res = await fetch(

@@ -70,6 +70,8 @@ export type PendingRow = {
   period_month?: string; period_year?: string;
   leave_type?: string; from_date?: string; to_date?: string; total_leave_days?: number;
   attestation_type?: string;
+  /** Note de frais : file_url du reçu joint (M0-②), servi via le proxy download. */
+  justificatif?: string;
 };
 export type PendingValidations = {
   scope: 'hr' | 'team' | 'none';
@@ -180,6 +182,23 @@ export const getRetirementStatus = (employee: string, reference_date?: string): 
 /** Relevé de carrière (pré-constitution dossier CNSS ; lecture). */
 export const getCareerStatement = (employee: string): Promise<CareerStatement> =>
   method('benin_hr.api.retirement.career_statement', { employee });
+
+// ---- M0-③④ : cohorte retraite + référentiel composantes (lecture gated) ----
+export type RetirementCohort = {
+  alert_months_before?: number; reference_date?: string;
+  alertes: Array<{ employee: string; employee_name: string; legal_retirement_date: string;
+    months_to_retirement: number; overdue: boolean }>;
+  incomplets: Array<{ employee: string; employee_name?: string; error: string }>;
+  error?: string; missing?: string[];
+};
+
+/** Cohorte d'approche retraite — le SEUIL vient de la réponse (jamais codé front). */
+export const getRetirementCohort = (): Promise<RetirementCohort> =>
+  method('benin_hr.api.retirement.retirement_cohort');
+
+/** Référentiel des composantes (Department natif, D05 §5) — méthode gated only_for. */
+export const getComposantes = async (): Promise<string[]> =>
+  (await method<{ composantes: string[] }>('benin_hr.api.referentiels.list_composantes'))?.composantes ?? [];
 
 /** Génération d'une déclaration/état social à la demande. POST (et non GET) :
  *  les sorties csv/pdf INSÈRENT un doc File privé — en GET, Frappe rollback la

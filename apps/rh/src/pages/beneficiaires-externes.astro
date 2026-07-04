@@ -3,7 +3,7 @@ import Layout from '../layouts/RhLayout.astro';
 import Icon from '../components/Icon.astro';
 import StatusBadge from '../components/StatusBadge.astro';
 import Drawer from '../components/Drawer.astro';
-import { getBeneficiaires } from '@emela/shared/rh-data';
+import { getBeneficiaires, getComposantes } from '@emela/shared/rh-data';
 
 // Data-in réel : REST `Beneficiaire Externe` (DocPerm back — HR User r/w/c, Director r).
 const beneficiaires = await getBeneficiaires();
@@ -12,7 +12,16 @@ const archives = beneficiaires.length - actifs;
 
 // Présentation (énum back → variante DS). Pas de donnée métier ici.
 const TYPE_VARIANT: Record<string, string> = { Vacataire: 'info', Prestataire: 'accent' };
-const COMPOSANTES_EXISTANTES = [...new Set(beneficiaires.map((b) => b.composante).filter(Boolean))].sort();
+// M0-④ : référentiel composantes (Department natif, D05 §5) ∪ valeurs déjà
+// saisies — la saisie libre reste possible, le référentiel PROPOSE. Dégradation
+// propre si la lecture référentiel échoue (datalist = données seules).
+let referentiel: string[] = [];
+try {
+  referentiel = await getComposantes();
+} catch (e) {
+  console.error('[beneficiaires-externes] référentiel composantes indisponible', e);
+}
+const COMPOSANTES_EXISTANTES = [...new Set([...referentiel, ...beneficiaires.map((b) => b.composante).filter(Boolean)])].sort() as string[];
 ---
 <Layout title="Bénéficiaires externes — emela RH" page="beneficiaires-externes">
 <style is:global>
@@ -153,7 +162,7 @@ const COMPOSANTES_EXISTANTES = [...new Set(beneficiaires.map((b) => b.composante
   </div>
   <div class="em-field" data-when="Vacataire" hidden>
     <label class="em-field-label">Composante de rattachement <span class="em-required">*</span></label>
-    {/* TODO BACK-FIXES ④ : référentiel composantes (SRC-COMP, D02 §6.5) inexistant côté back — datalist dérivée des données en attendant */}
+    {/* Référentiel composantes M0-④ (SRC-COMP, D02 §6.5) : Department natif ∪ valeurs saisies — datalist propositionnelle, saisie libre conservée. */}
     <input class="em-input" data-f="composante" list="composantes-list" placeholder="Ex. FAST — Sciences & techniques" />
     <datalist id="composantes-list">{COMPOSANTES_EXISTANTES.map((c) => <option value={c} />)}</datalist>
     <span class="em-field-help">Obligatoire pour un vacataire — contrôlé au back.</span>

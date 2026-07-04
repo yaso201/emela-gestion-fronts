@@ -91,6 +91,8 @@ export const createAcompte = (input: {
 /** Dépôt d'une note de frais. */
 export const createNoteDeFrais = (input: {
   category: string; amount: number; expense_date: string; description?: string;
+  /** file_url Frappe (/private/files/…) d'un reçu déjà uploadé (M0-②). */
+  justificatif?: string;
 }): Promise<CreatedRequest> => writeMethod(`${SELF}.create_note_de_frais`, input);
 
 /** Saisie d'heures supplémentaires. */

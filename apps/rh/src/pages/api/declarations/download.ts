@@ -7,6 +7,10 @@ const BASE = (import.meta as any).env?.PUBLIC_FRAPPE_URL ?? '';
 const CONTENT_TYPES: Record<string, string> = {
   csv: 'text/csv; charset=utf-8',
   pdf: 'application/pdf',
+  // M0-② : justificatifs de notes de frais (reçus) servis par le même proxy.
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
 };
 
 /** Proxy de téléchargement des fichiers privés produits par les déclarations
@@ -35,7 +39,7 @@ export const GET: APIRoute = async ({ url, cookies }) => {
     }
     const buf = await res.arrayBuffer();
     const fname = path.split('/').pop() || `declaration.${ext}`;
-    const asciiName = fname.replace(/[^\x20-\x7E]/g, '_');
+    const asciiName = fname.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_'); // quote-safe (M0-⑤)
     return new Response(buf, {
       status: 200,
       headers: {
