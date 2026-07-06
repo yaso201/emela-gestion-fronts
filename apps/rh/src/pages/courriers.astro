@@ -1,6 +1,11 @@
 ---
 import Layout from '../layouts/RhLayout.astro';
-import { getPendingValidations, getDeliveredAttestations } from '@emela/shared/rh-data';
+import Drawer from '../components/Drawer.astro';
+import {
+  getPendingValidations, getDeliveredAttestations,
+  getHrLetters, getHrLetterTemplates, getDirectory,
+  type HrLetter, type HrLetterTemplate,
+} from '@emela/shared/rh-data';
 
 // Data-in réel :
 //  • File à délivrer = get_pending_validations().attestations (scope hr) — la SoD est
@@ -9,6 +14,22 @@ import { getPendingValidations, getDeliveredAttestations } from '@emela/shared/r
 const pending = await getPendingValidations();
 const queue = pending.attestations ?? [];
 const delivered = await getDeliveredAttestations();
+
+// M2b — courriers HR Letter (cycle DEC-30). Chaque data-in est dégradé
+// proprement (leçon ressource-par-ressource : paie n'a pas read HR Letter).
+let lettres: HrLetter[] = [];
+let lettresIndisponibles = false;
+try { lettres = await getHrLetters(); } catch { lettresIndisponibles = true; }
+let modeles: HrLetterTemplate[] = [];
+try { modeles = await getHrLetterTemplates(); } catch { modeles = []; }
+let annuaire: Awaited<ReturnType<typeof getDirectory>> = [];
+try { annuaire = await getDirectory(); } catch { annuaire = []; }
+const LETTRE_STATUS: Record<string, { variant: string; label: string }> = {
+  Brouillon: { variant: 'neutral', label: 'Brouillon' },
+  Valide: { variant: 'info', label: 'Validé' },
+  Signe: { variant: 'warning', label: 'Signé' },
+  Diffuse: { variant: 'success', label: 'Diffusé' },
+};
 
 const TYPE_LABEL: Record<string, string> = {
   Travail: 'Attestation de travail',
@@ -113,17 +134,69 @@ const dfr = (s?: string) => { if (!s) return '—'; const p = String(s).slice(0,
     </div>
   </div>
 
-  <!-- ===== Lettres RH (BACK-GAP DEC-26) ===== -->
+  <!-- ===== Lettres RH (générateur HR Letter, DEC-26 — M2b) ===== -->
   <div class="tabpane" data-pane="lettres" hidden>
-    <div class="gap-card">
-      <span class="g-ic"><svg class="ico-lg"><use href="#i-warning"/></svg></span>
-      <div>
-        <div class="g-tt">Générateur de lettres RH indisponible — écart back tracé (DEC-26)</div>
-        <p>Aucun générateur <b>HR Letter</b> n'existe côté back <code class="mono-sm">benin_hr</code> (recherche <code class="mono-sm">hr_letter / generate_*_letter</code> → 0). Conformément à « 0 endpoint inventé », cette section reste en <b>repli vide</b> — aucune génération de courrier simulée. Seul le flux <b>Attestations</b> (prouvé) est câblé.</p>
-        <span class="todo">Nouveau chantier back CH-COURRIERS — exposer un générateur HR Letter → puis câbler cet onglet</span>
-      </div>
-    </div>
+    {lettresIndisponibles ? (
+      <div class="em-alert em-alert--warning"><span class="em-alert-icon"><svg class="ico-sm"><use href="#i-warning"/></svg></span><div class="em-alert-body"><span class="em-alert-text">Courriers non lisibles pour votre profil (permission HR Letter absente) — frontière de permission, pas une panne.</span></div></div>
+    ) : (
+      <>
+        <div class="rh-pagehead-actions" style="margin-bottom:var(--space-5)">
+          <button class="em-btn em-btn--primary" data-roles="gest_rh admin" data-new-lettre><svg class="ico-sm"><use href="#i-plus"/></svg>Nouveau courrier</button>
+        </div>
+        <div class="em-table-wrap">
+          <table class="em-table">
+            <thead><tr><th>Référence</th><th>Salarié</th><th class="hide-md">Type</th><th class="hide-md">Sujet</th><th>Statut</th><th style="text-align:right">Actions</th></tr></thead>
+            <tbody>
+              {lettres.length === 0 && <tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:var(--space-9)">Aucun courrier émis. Créez le premier depuis un modèle.</td></tr>}
+              {lettres.map((l) => {
+                const st = LETTRE_STATUS[l.statut] ?? { variant: 'neutral', label: l.statut };
+                return (
+                  <tr data-lettre={l.name}>
+                    <td><span class="num">{l.name}</span></td>
+                    <td>{l.employee_name}</td>
+                    <td class="hide-md">{l.letter_type || '—'}</td>
+                    <td class="hide-md">{l.sujet}</td>
+                    <td><span class:list={["em-badge", "em-badge--sm", `em-badge--${st.variant}`]}><span class="em-badge-dot"></span>{st.label}</span></td>
+                    <td>
+                      <div class="row-actions">
+                        {l.statut === 'Brouillon' && <button class="em-btn em-btn--primary em-btn--sm" data-lettre-action="valider" data-name={l.name}>Valider</button>}
+                        {l.statut === 'Valide' && <button class="em-btn em-btn--primary em-btn--sm" data-lettre-action="signer" data-name={l.name}>Signer (DRH)</button>}
+                        {l.statut === 'Signe' && <button class="em-btn em-btn--primary em-btn--sm" data-lettre-action="diffuser" data-name={l.name}>Diffuser</button>}
+                        {(l.statut === 'Signe' || l.statut === 'Diffuse') && <a class="em-btn em-btn--secondary em-btn--sm" href={`/api/courriers/lettre-pdf?name=${encodeURIComponent(l.name)}`} target="_blank" rel="noopener"><svg class="ico-sm"><use href="#i-download"/></svg>PDF</a>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </>
+    )}
   </div>
+
+  <div class="rh-scrim" id="rh-scrim"></div>
+  <Drawer id="drawer-lettre" title="Nouveau courrier" sub="Le contenu est rendu depuis le modèle et FIGÉ dès la validation (DEC-30).">
+    <div class="em-field">
+      <label class="em-field-label">Modèle <span class="em-required">*</span></label>
+      <select class="em-select" id="lt-template">
+        <option value="">Sélectionner…</option>
+        {modeles.map((m) => <option value={m.name}>{m.letter_type} — {m.name}</option>)}
+      </select>
+    </div>
+    <div class="em-field">
+      <label class="em-field-label">Salarié <span class="em-required">*</span></label>
+      <select class="em-select" id="lt-employee">
+        <option value="">Sélectionner…</option>
+        {annuaire.map((e) => <option value={e.id}>{e.employeeName} — {e.id}</option>)}
+      </select>
+      {annuaire.length === 0 && <span class="em-field-help">Annuaire non lisible pour votre profil — saisir le matricule via le Desk.</span>}
+    </div>
+    <Fragment slot="foot">
+      <button class="em-btn em-btn--secondary" data-drawer-close>Annuler</button>
+      <button class="em-btn em-btn--primary" id="lt-create">Créer le brouillon</button>
+    </Fragment>
+  </Drawer>
 </main>
 
 <script is:inline>
@@ -150,6 +223,34 @@ const dfr = (s?: string) => { if (!s) return '—'; const p = String(s).slice(0,
         setTimeout(function () { location.reload(); }, 600);
       });
     });
+    // M2b — courriers HR Letter : création depuis modèle + transitions DEC-30.
+    var nl = document.querySelector('[data-new-lettre]');
+    if (nl) nl.addEventListener('click', function () { window.RhDrawer.open('drawer-lettre'); });
+    var ltCreate = document.getElementById('lt-create');
+    if (ltCreate) ltCreate.addEventListener('click', async function () {
+      var tpl = (document.getElementById('lt-template') || {}).value;
+      var emp = (document.getElementById('lt-employee') || {}).value;
+      if (!tpl || !emp) { rhToast('Modèle et salarié requis.', false); return; }
+      ltCreate.disabled = true;
+      var r = await post('/api/courriers/lettres', { action: 'creer', template: tpl, employee: emp });
+      ltCreate.disabled = false;
+      if (!r.ok) { rhToast(r.data.error || 'Échec de la création', false); return; }
+      window.RhDrawer.close();
+      rhToast('Courrier ' + r.data.name + ' créé (brouillon)', true);
+      setTimeout(function () { location.reload(); }, 600);
+    });
+    document.querySelectorAll('[data-lettre-action]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var action = btn.getAttribute('data-lettre-action');
+        btn.disabled = true;
+        var r = await post('/api/courriers/lettres', { action: action, name: btn.getAttribute('data-name') });
+        btn.disabled = false;
+        if (!r.ok) { rhToast(r.data.error || 'Échec de la transition', false); return; }
+        rhToast('Courrier ' + r.data.name + ' → ' + r.data.statut, true);
+        setTimeout(function () { location.reload(); }, 600);
+      });
+    });
+
     document.querySelectorAll('[data-tab]').forEach(function (t) {
       t.addEventListener('click', function () {
         document.querySelectorAll('[data-tab]').forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-selected', 'false'); });

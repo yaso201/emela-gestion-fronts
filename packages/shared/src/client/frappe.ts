@@ -89,6 +89,11 @@ export const createAcompte = (input: {
 }): Promise<CreatedRequest> => writeMethod(`${SELF}.create_acompte`, input);
 
 /** Dépôt d'une note de frais. */
+/** Courriers RH diffusés au salarié connecté (M2b, lecture own résolue serveur). */
+export type MyLetter = { name: string; letter_type?: string; sujet: string; diffuse_le?: string; has_document: boolean };
+export const getMyLetters = (): Promise<MyLetter[]> =>
+  method('benin_hr.api.courriers_rh.get_my_letters');
+
 export const createNoteDeFrais = (input: {
   category: string; amount: number; expense_date: string; description?: string;
   /** file_url Frappe (/private/files/…) d'un reçu déjà uploadé (M0-②). */

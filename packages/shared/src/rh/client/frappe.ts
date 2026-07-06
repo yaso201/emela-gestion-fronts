@@ -200,6 +200,52 @@ export const getRetirementCohort = (): Promise<RetirementCohort> =>
 export const getComposantes = async (): Promise<string[]> =>
   (await method<{ composantes: string[] }>('benin_hr.api.referentiels.list_composantes'))?.composantes ?? [];
 
+// ---- M2b : courriers RH (HR Letter, DEC-26) — cycle DEC-30 ----
+const COURRIERS = 'benin_hr.api.courriers_rh';
+
+export type HrLetter = {
+  name: string; employee: string; employee_name?: string;
+  letter_type?: string; sujet: string;
+  statut: 'Brouillon' | 'Valide' | 'Signe' | 'Diffuse' | string;
+  valide_par?: string; signe_par?: string; diffuse_le?: string; document?: string;
+  creation?: string;
+};
+export type HrLetterTemplate = { name: string; letter_type: string; sujet: string };
+
+/** Lettres émises (REST, DocPerm HRU/HRM/Dir — dégrader pour les autres profils). */
+export const getHrLetters = async (): Promise<HrLetter[]> => {
+  const rows = await resource<any[]>(
+    'HR Letter',
+    ['name', 'employee', 'letter_type', 'sujet', 'statut', 'valide_par', 'signe_par',
+     'diffuse_le', 'document', 'creation'],
+    {}, 'creation desc',
+  );
+  // Leçon ressource-par-ressource : jointure noms dégradée en matricules si le
+  // profil n'a pas read Employee.
+  const ids = [...new Set(rows.map((r) => r.employee).filter(Boolean))];
+  let byId: Record<string, string> = {};
+  try {
+    const emps = ids.length
+      ? await resource<any[]>('Employee', ['name', 'employee_name'], { name: ['in', ids] })
+      : [];
+    byId = Object.fromEntries(emps.map((e) => [e.name, e.employee_name]));
+  } catch {
+    byId = {};
+  }
+  return rows.map((r) => ({ ...r, employee_name: byId[r.employee] ?? r.employee }));
+};
+
+/** Modèles actifs (méthode gated only_for — pour le drawer de création). */
+export const getHrLetterTemplates = (): Promise<HrLetterTemplate[]> =>
+  method(`${COURRIERS}.list_templates`);
+
+export const createHrLetter = (template: string, employee: string): Promise<{ name: string; statut: string; sujet: string }> =>
+  writeMethod(`${COURRIERS}.create_letter_from_template`, { template, employee });
+
+/** Transition du cycle DEC-30 (gates de rôle au contrôleur back). */
+export const transitionHrLetter = (name: string, action: 'valider' | 'signer' | 'diffuser'): Promise<{ name: string; statut: string; document: boolean }> =>
+  writeMethod(`${COURRIERS}.${action}_lettre`, { name });
+
 /** Génération d'une déclaration/état social à la demande. POST (et non GET) :
  *  les sorties csv/pdf INSÈRENT un doc File privé — en GET, Frappe rollback la
  *  transaction en fin de requête et la download_url renvoyée pointe dans le vide

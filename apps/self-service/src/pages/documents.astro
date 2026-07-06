@@ -2,13 +2,15 @@
 import Layout from '../layouts/SelfServiceLayout.astro';
 import Icon from '../components/Icon.astro';
 import PageHead from '../components/PageHead.astro';
-import { getMyAttestations } from '@emela/shared/data';
-import type { MyAttestation } from '@emela/shared/data';
+import { getMyAttestations, getMyLetters } from '@emela/shared/data';
+import type { MyAttestation, MyLetter } from '@emela/shared/data';
 
 let attestations: MyAttestation[] = [];
+let lettres: MyLetter[] = [];
 let fetchError = false;
 try {
   attestations = await getMyAttestations();
+  lettres = await getMyLetters();
 } catch {
   fetchError = true;
 }
@@ -64,6 +66,21 @@ const REQUESTABLE = [
         </div>
       );
     })}
+  </div>
+
+  <p class="hr-section-label">Courriers reçus</p>
+  <div class="em-card" style="margin-bottom:var(--space-9)">
+    {lettres.length === 0 ? (
+      <div style="padding:var(--space-8);text-align:center;color:var(--text-tertiary)"><Icon name="i-doc" cls="ico-lg" /><p style="margin-top:var(--space-2);font-size:var(--text-sm)">Aucun courrier RH diffusé pour le moment.</p></div>
+    ) : lettres.map((l) => (
+      <div class="doc-row">
+        <span class="em-doc-icon em-doc-icon--accent"><Icon name="i-doc" cls="ico" /></span>
+        <div class="main"><div class="t">{l.sujet}</div><div class="m">Réf. {l.name}{l.letter_type ? ` · ${l.letter_type}` : ''}{l.diffuse_le ? ` · diffusé le ${String(l.diffuse_le).slice(0, 10)}` : ''}</div></div>
+        <div class="side">
+          {l.has_document && <a class="em-btn em-btn--secondary em-btn--sm" href={`/api/courrier/pdf?id=${encodeURIComponent(l.name)}`} target="_blank" rel="noopener"><Icon name="i-download" cls="ico-sm" />PDF</a>}
+        </div>
+      </div>
+    ))}
   </div>
 
   <p class="hr-section-label">Demander un document</p>

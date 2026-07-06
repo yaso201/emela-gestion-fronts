@@ -58,6 +58,8 @@ const API_PROFILES: Record<string, string[]> = {
   '/api/beneficiaires/save': ['gest_rh', 'admin'],
   '/api/beneficiaires/archive': ['gest_rh', 'admin'],
   '/api/retraite/status': ['gest_rh', 'paie', 'dir', 'admin'],
+  // Courriers RH (M2b) : cycle DEC-30 — le back gate chaque transition (rôle réel).
+  '/api/courriers/lettres': ['gest_rh', 'dir', 'admin'],
 };
 
 export const onRequest = defineMiddleware(async (context, next) => {
